@@ -26,8 +26,7 @@ GUV content area calculation for each prediction
 
 Grouped bar plots by concentration and GUV diameter
 
-<img src="https://github.com/user-attachments/assets/02446b8a-6e47-48c7-8590-9a855a5b8280" style="width:70%;"/>
-<img src="https://github.com/user-attachments/assets/52fa1ec9-14ad-40fa-be72-3f7e91296967" style="width:40%;"/>
+<img src="https://github.com/user-attachments/assets/0ba464ca-b8cd-4d16-a89e-af54d19984f7" style="width:70%;"/>
 
 #### Dependencies
 
