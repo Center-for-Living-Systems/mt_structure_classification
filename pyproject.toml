@@ -1,0 +1,58 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "mt_structure_classification"
+version = "0.1.0"
+description = "GUV/MT segmentation + microtubule structure classification pipeline"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+authors = [
+  { name = "Liya Ding" }
+]
+
+dependencies = [
+  "numpy",
+  "pandas",
+  "matplotlib",
+  "scikit-image",
+  "opencv-python",
+  "tifffile",
+  "csbdeep",
+  "scipy",
+  "pillow",
+  "scikit-learn",
+  "torch",
+  "torchvision",
+  "tqdm",
+]
+
+[project.optional-dependencies]
+cellpose = ["cellpose"]
+dev = [
+  "pytest",
+  "ruff",
+  "black",
+  "mypy",
+  "ipykernel",
+]
+
+# command after install: mt-struct (you can rename this too)
+[project.scripts]
+mt-struct = "mt_structure_classification.pipeline:main"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.black]
+line-length = 100
+target-version = ["py310"]
