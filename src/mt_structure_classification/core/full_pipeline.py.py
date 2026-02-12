@@ -69,14 +69,17 @@ class SegmentationConfig:
     hough_minDist_small: int = 20
     hough_minDist_med: int = 40
     hough_minDist_large: int = 60
+
     hough_param1_small: int = 30
     hough_param2_small: int = 30
     hough_minRadius_small: int = 10
     hough_maxRadius_small: int = 30
+    
     hough_param1_med: int = 25
     hough_param2_med: int = 40
     hough_minRadius_med: int = 30
     hough_maxRadius_med: int = 60
+   
     hough_param1_large: int = 20
     hough_param2_large: int = 60
     hough_minRadius_large: int = 60

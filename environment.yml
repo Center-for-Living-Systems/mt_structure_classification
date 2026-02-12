@@ -1,0 +1,28 @@
+name: mt_structure_classification
+channels:
+  - pytorch
+  - nvidia
+  - conda-forge
+
+dependencies:
+  - python=3.11
+  - pip
+  - pytorch
+  - torchvision
+  - torchaudio
+  - pytorch-cuda=12.4
+  - numpy
+  - pandas
+  - matplotlib
+  - scikit-image
+  - tifffile
+  - csbdeep
+  - scipy
+  - pillow
+  - scikit-learn
+  - tqdm
+  - opencv
+  - pip:
+      - cellpose==3.1.1.2
+      - -e .
+

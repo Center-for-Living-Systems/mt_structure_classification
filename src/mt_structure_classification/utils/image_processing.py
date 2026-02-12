@@ -74,3 +74,8 @@ def compute_background_median(
     bg = np.nanmedian(stack, axis=0)
     bg_f = median(bg, footprint=disk(disk_radius))
     return bg_f.astype(np.float32, copy=False)
+
+def load_pair_image_2d(guv_path, mt_path):        
+    guv_img = imread(str(guv_path))
+    mt_img  = imread(str(mt_path))
+    return guv_img, mt_img 

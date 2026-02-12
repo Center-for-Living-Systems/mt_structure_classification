@@ -27,10 +27,10 @@ dependencies = [
   "torch",
   "torchvision",
   "tqdm",
+  "cellpose==3.1.1.2",
 ]
 
 [project.optional-dependencies]
-cellpose = ["cellpose"]
 dev = [
   "pytest",
   "ruff",
