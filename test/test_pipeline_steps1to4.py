@@ -170,8 +170,8 @@ class TestStep2Background:
 class TestStep3HoughSegmentation:
     def test_hough_circles_runs(self, background_and_stats):
         from mt_structure_classification.utils.GUV_mt_segmentation import (
-            segment_guv_hough_circles,
             DEFAULT_HOUGH_SCALES,
+            segment_guv_hough_circles,
         )
 
         stats = background_and_stats["stats"]
@@ -202,9 +202,9 @@ class TestStep3HoughSegmentation:
 
     def test_combine_circle_only(self, background_and_stats):
         from mt_structure_classification.utils.GUV_mt_segmentation import (
-            segment_guv_hough_circles,
-            combine_segmentations,
             DEFAULT_HOUGH_SCALES,
+            combine_segmentations,
+            segment_guv_hough_circles,
         )
 
         stats = background_and_stats["stats"]
@@ -264,7 +264,7 @@ class TestStep3CellposeSegmentation:
             (mt_corr[0] - mt_1p) / max(mt_99p - mt_1p, 1e-6), 0, 1
         ).astype(np.float32)
 
-        label_mask_filtered, bad_flags = segment_guv_cellpose(
+        label_mask_filtered, _bad_flags = segment_guv_cellpose(
             guv_norm, mt_norm, mt_corr[0],
             model_type="cyto3",
             gpu=False,  # CPU for CI
@@ -289,10 +289,10 @@ class TestStep3CellposeSegmentation:
 class TestStep4Cropping:
     def test_crop_from_hough(self, background_and_stats, tmp_path, indexed_pairs):
         from mt_structure_classification.utils.GUV_mt_segmentation import (
-            segment_guv_hough_circles,
+            DEFAULT_HOUGH_SCALES,
             combine_segmentations,
             crop_objects_from_masks_or_circles,
-            DEFAULT_HOUGH_SCALES,
+            segment_guv_hough_circles,
         )
 
         stats = background_and_stats["stats"]
@@ -347,10 +347,10 @@ class TestStep4Cropping:
     def test_all_images_process(self, background_and_stats, tmp_path, indexed_pairs):
         """Run the full pipeline loop over all 5 test images."""
         from mt_structure_classification.utils.GUV_mt_segmentation import (
-            segment_guv_hough_circles,
+            DEFAULT_HOUGH_SCALES,
             combine_segmentations,
             crop_objects_from_masks_or_circles,
-            DEFAULT_HOUGH_SCALES,
+            segment_guv_hough_circles,
         )
 
         stats = background_and_stats["stats"]

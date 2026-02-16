@@ -1,12 +1,15 @@
 from __future__ import annotations
 
 from pathlib import Path
-import pandas as pd
+
 import numpy as np
 
-from mt_structure_classification.utils.filesystem import ensure_dir
 from mt_structure_classification.dataset.image_files_indexing import build_pairs_dataframe_flexible
-from mt_structure_classification.utils.image_processing import stack_pairs_to_arrays, compute_background_median
+from mt_structure_classification.utils.filesystem import ensure_dir
+from mt_structure_classification.utils.image_processing import (
+    compute_background_median,
+    stack_pairs_to_arrays,
+)
 
 
 def run_mt_guv_background_pipeline(

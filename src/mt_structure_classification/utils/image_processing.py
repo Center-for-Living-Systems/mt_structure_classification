@@ -1,14 +1,12 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Tuple, Optional
 
-import numpy as np
 import cv2
-from tifffile import imread
+import numpy as np
 from skimage.filters import median
 from skimage.morphology import disk
-
+from tifffile import imread
 
 # ============================================================
 #                     LOADING
@@ -42,7 +40,7 @@ def load_pair_image_2d(
 #                     STACKING
 # ============================================================
 
-def pad_or_crop_to_shape(img: np.ndarray, target_shape: Tuple[int, int]) -> np.ndarray:
+def pad_or_crop_to_shape(img: np.ndarray, target_shape: tuple[int, int]) -> np.ndarray:
     """
     Pads with zeros (bottom/right) or crops (top-left region) to target_shape.
     """
@@ -56,7 +54,7 @@ def pad_or_crop_to_shape(img: np.ndarray, target_shape: Tuple[int, int]) -> np.n
 
 def stack_pairs_to_arrays(
     df,
-    target_shape: Tuple[int, int] = (512, 512),
+    target_shape: tuple[int, int] = (512, 512),
     nan_for_zero: bool = True,
 ) -> tuple[np.ndarray, np.ndarray]:
     """
@@ -446,8 +444,8 @@ def crop_mask_patch(
         return np.full((patch_size, patch_size), fill_value=bg_intensity, dtype=np.float32)
 
     # centroid
-    cy = int(round(float(ys.mean())))
-    cx = int(round(float(xs.mean())))
+    cy = round(float(ys.mean()))
+    cx = round(float(xs.mean()))
 
     x0 = cx - half
     x1 = cx + half

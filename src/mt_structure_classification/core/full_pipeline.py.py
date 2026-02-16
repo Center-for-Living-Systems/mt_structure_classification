@@ -1,36 +1,36 @@
 # src/mt_structure_classification/core/pipeline.py
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Literal, Optional, Sequence
+from typing import Literal
 
 import numpy as np
 import pandas as pd
 
-# ---------- local imports (package-internal) ----------
-from mt_structure_classification.utils.filesystem import ensure_dir
-
-# indexing / pairing + stacking + background
-from mt_structure_classification.dataset.image_files_indexing import build_pairs_dataframe_flexible
-from mt_structure_classification.utils.image_processing import (
-    stack_pairs_to_arrays,
-    compute_background_median,
-    remove_background_and_pad,
-)
-
-# segmentation backends
-from mt_structure_classification.utils.GUV_mt_segmentation import (
-    segment_guv_cellpose,
-    segment_guv_hough_circles,  # UPDATED usage (scales list)
-    combine_segmentations,
-    crop_objects_from_masks_or_circles,
-)
+from mt_structure_classification.core.predict import predict_on_folder
 
 # training + inference
 from mt_structure_classification.core.train import train_classifier
-from mt_structure_classification.core.predict import predict_on_folder
 
+# indexing / pairing + stacking + background
+from mt_structure_classification.dataset.image_files_indexing import build_pairs_dataframe_flexible
+
+# ---------- local imports (package-internal) ----------
+from mt_structure_classification.utils.filesystem import ensure_dir
+
+# segmentation backends
+from mt_structure_classification.utils.GUV_mt_segmentation import (
+    combine_segmentations,
+    crop_objects_from_masks_or_circles,
+    segment_guv_cellpose,
+    segment_guv_hough_circles,  # UPDATED usage (scales list)
+)
+from mt_structure_classification.utils.image_processing import (
+    compute_background_median,
+    remove_background_and_pad,
+    stack_pairs_to_arrays,
+)
 
 SegMethod = Literal["cellpose", "circle", "combined"]
 Task = Literal["preprocess", "segment", "train", "predict", "all"]
@@ -71,7 +71,7 @@ class SegmentationConfig:
 
     # cellpose params (only used if method includes cellpose)
     cellpose_model: str = "cyto2"
-    cellpose_diameter: Optional[float] = None
+    cellpose_diameter: float | None = None
     cellpose_channels: tuple[int, int] = (0, 0)
 
     # circle/hough params (only used if method includes circle)
@@ -116,6 +116,10 @@ class PredictConfig:
     batch_size: int = 32
 
 
+_DEFAULT_PREPROCESS = PreprocessConfig()
+_DEFAULT_SEGMENTATION = SegmentationConfig()
+
+
 # ======================================================
 #                PIPELINE: PREPROCESS
 # ======================================================
@@ -123,7 +127,7 @@ def run_mt_guv_background_pipeline(
     root_folder: str | Path,
     output_folder: str | Path,
     dataset_name: str,
-    preprocess: PreprocessConfig = PreprocessConfig(),
+    preprocess: PreprocessConfig | None = None,
 ) -> dict[str, object]:
     """
     1) index pairs -> df
@@ -131,6 +135,8 @@ def run_mt_guv_background_pipeline(
     3) compute background images
     4) save outputs
     """
+    if preprocess is None:
+        preprocess = _DEFAULT_PREPROCESS
     out_root = ensure_dir(output_folder)
     processed_folder = ensure_dir(out_root / dataset_name / "processed_MT")
 
@@ -166,8 +172,8 @@ def run_segmentation_pipeline(
     df: pd.DataFrame,
     output_folder: str | Path,
     dataset_name: str,
-    seg: SegmentationConfig = SegmentationConfig(),
-    preprocess: PreprocessConfig = PreprocessConfig(),
+    seg: SegmentationConfig | None = None,
+    preprocess: PreprocessConfig | None = None,
 ) -> dict[str, object]:
     """
     Produces:
@@ -175,6 +181,10 @@ def run_segmentation_pipeline(
       - per-object metadata CSV (centers/radius or mask regionprops)
       - optional debug panels
     """
+    if seg is None:
+        seg = _DEFAULT_SEGMENTATION
+    if preprocess is None:
+        preprocess = _DEFAULT_PREPROCESS
     out_root = ensure_dir(output_folder)
     processed = ensure_dir(out_root / dataset_name / "processed_MT")
 
@@ -329,11 +339,15 @@ def run_full_pipeline(
     root_folder: str | Path,
     output_folder: str | Path,
     dataset_name: str,
-    seg: SegmentationConfig = SegmentationConfig(),
-    preprocess: PreprocessConfig = PreprocessConfig(),
-    training: Optional[TrainingConfig] = None,
-    pred: Optional[PredictConfig] = None,
+    seg: SegmentationConfig | None = None,
+    preprocess: PreprocessConfig | None = None,
+    training: TrainingConfig | None = None,
+    pred: PredictConfig | None = None,
 ) -> dict[str, object]:
+    if seg is None:
+        seg = _DEFAULT_SEGMENTATION
+    if preprocess is None:
+        preprocess = _DEFAULT_PREPROCESS
     results: dict[str, object] = {}
 
     if task in ("preprocess", "segment", "all"):

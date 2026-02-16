@@ -1,4 +1,5 @@
 from __future__ import annotations
+
 import json
 from pathlib import Path
 
@@ -6,8 +7,12 @@ import pandas as pd
 import torch
 from torch.utils.data import DataLoader
 
-from mt_structure_classification.dataset.dataset import ClassifyConfig, build_transforms, ImageCSVDataset
 from mt_structure_classification.core.model import build_efficientnet_b0
+from mt_structure_classification.dataset.dataset import (
+    ClassifyConfig,
+    ImageCSVDataset,
+    build_transforms,
+)
 from mt_structure_classification.utils.device import get_device
 
 
@@ -17,11 +22,13 @@ def predict_csv(
     model_path: str | Path,
     label_map_path: str | Path,
     out_csv: str | Path,
-    cls_cfg: ClassifyConfig = ClassifyConfig(),
+    cls_cfg: ClassifyConfig | None = None,
     batch_size: int = 64,
     num_workers: int = 4,
     filename_col: str = "filename",
 ):
+    if cls_cfg is None:
+        cls_cfg = ClassifyConfig()
     csv_path = Path(csv_path)
     out_csv = Path(out_csv)
 

@@ -58,6 +58,31 @@ where = ["src"]
 line-length = 100
 target-version = "py310"
 
+[tool.ruff.lint]
+select = [
+  "E",      # pycodestyle errors
+  "W",      # pycodestyle warnings
+  "F",      # pyflakes
+  "I",      # isort
+  "UP",     # pyupgrade
+  "B",      # flake8-bugbear
+  "SIM",    # flake8-simplify
+  "RUF",    # ruff-specific
+]
+ignore = [
+  "E501",   # line too long (handled by formatter)
+  "E741",   # ambiguous variable name (common in scientific code: l, I, O)
+  "B905",   # zip strict (not needed for scientific code)
+  "RUF002", # ambiguous unicode in docstrings (× is fine)
+  "RUF003", # ambiguous unicode in comments (× is fine)
+]
+
+[tool.ruff.lint.isort]
+known-first-party = ["mt_structure_classification"]
+
+[tool.ruff.format]
+quote-style = "double"
+
 [tool.black]
 line-length = 100
 target-version = ["py310"]

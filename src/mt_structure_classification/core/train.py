@@ -1,18 +1,23 @@
 from __future__ import annotations
+
 import json
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict, Tuple
 
 import pandas as pd
 import torch
 import torch.optim as optim
-from torch.utils.data import DataLoader
 from sklearn.model_selection import train_test_split
+from torch.utils.data import DataLoader
 
-from mt_structure_classification.dataset.dataset import ClassifyConfig, build_transforms, ImageCSVDataset
-from mt_structure_classification.core.model import build_efficientnet_b0, FocalLoss
+from mt_structure_classification.core.model import FocalLoss, build_efficientnet_b0
+from mt_structure_classification.dataset.dataset import (
+    ClassifyConfig,
+    ImageCSVDataset,
+    build_transforms,
+)
 from mt_structure_classification.utils.device import get_device
+
 
 @dataclass
 class TrainConfig:
@@ -25,7 +30,7 @@ class TrainConfig:
     seed: int = 42
 
 
-def make_label_map(df: pd.DataFrame, label_col: str = "label") -> Dict[str, int]:
+def make_label_map(df: pd.DataFrame, label_col: str = "label") -> dict[str, int]:
     labels = sorted(df[label_col].dropna().astype(str).unique())
     return {lab: i for i, lab in enumerate(labels)}
 
@@ -34,11 +39,15 @@ def train_classifier(
     csv_path: str | Path,
     image_root: str | Path,
     out_dir: str | Path,
-    cls_cfg: ClassifyConfig = ClassifyConfig(),
-    train_cfg: TrainConfig = TrainConfig(),
+    cls_cfg: ClassifyConfig | None = None,
+    train_cfg: TrainConfig | None = None,
     label_col: str = "label",
     filename_col: str = "filename",
 ) -> Path:
+    if cls_cfg is None:
+        cls_cfg = ClassifyConfig()
+    if train_cfg is None:
+        train_cfg = TrainConfig()
     out_dir = Path(out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
 

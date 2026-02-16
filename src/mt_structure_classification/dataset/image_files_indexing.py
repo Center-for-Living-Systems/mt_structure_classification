@@ -1,8 +1,8 @@
 from __future__ import annotations
 
+from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Iterable, Optional, Sequence
 
 import pandas as pd
 
@@ -34,7 +34,7 @@ def find_guv_dirs(root: Path, guv_dir_name: str = "GUV") -> list[Path]:
 def build_pairs_dataframe_flexible(
     root_folder: str | Path,
     output_debug_missing: bool = True,
-    rules: Optional[PairingRules] = None,
+    rules: PairingRules | None = None,
     guv_dir_name: str = "GUV",
     mt_dir_name: str = "Microtubule",
     # If True, take "condition" and "date" from the last 2 parent folders above GUV:
