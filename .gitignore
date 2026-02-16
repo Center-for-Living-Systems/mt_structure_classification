@@ -10,6 +10,10 @@ venv/
 ENV/
 env/
 
+
+# ignore the old notebooks
+original_notebooks/
+
 pip-wheel-metadata/
 *.egg-info/
 .eggs/
