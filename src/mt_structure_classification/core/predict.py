@@ -8,6 +8,7 @@ from torch.utils.data import DataLoader
 
 from mt_structure_classification.dataset.dataset import ClassifyConfig, build_transforms, ImageCSVDataset
 from mt_structure_classification.core.model import build_efficientnet_b0
+from mt_structure_classification.utils.device import get_device
 
 
 def predict_csv(
@@ -37,7 +38,7 @@ def predict_csv(
     loader = DataLoader(ds, batch_size=batch_size, shuffle=False,
                         num_workers=num_workers, pin_memory=True)
 
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    device = get_device()
     model = build_efficientnet_b0(num_classes=len(label_to_index), pretrained=False).to(device)
     model.load_state_dict(torch.load(model_path, map_location=device))
     model.eval()

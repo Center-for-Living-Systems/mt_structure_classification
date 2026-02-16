@@ -109,10 +109,6 @@ def filter_cellpose_masks(
         idx = region.label - 1  # 0-based index into bad_flags
 
         # shape filters
-        print("features:")
-        print(region.eccentricity)
-        print(region.area)
-                
         if (region.eccentricity > max_eccentricity
                 or region.area < min_area
                 or region.area > max_area):
@@ -122,8 +118,6 @@ def filter_cellpose_masks(
 
         # MT signal filter
         img_content = mt_med[label_mask == region.label]
-        print("content:")
-        print(img_content)
         img_content = img_content[img_content > mt_bg_int]
         if img_content.size == 0:
             bad_flags[idx] = 2
@@ -131,8 +125,6 @@ def filter_cellpose_masks(
             continue
 
         # MT std filter (fixed threshold — matches notebook)
-        print("std:")
-        print(img_content.std())
         if img_content.std() < mt_std_threshold:
             bad_flags[idx] = 3
             label_mask[label_mask == region.label] = 0

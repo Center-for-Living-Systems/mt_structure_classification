@@ -12,6 +12,7 @@ from sklearn.model_selection import train_test_split
 
 from mt_structure_classification.dataset.dataset import ClassifyConfig, build_transforms, ImageCSVDataset
 from mt_structure_classification.core.model import build_efficientnet_b0, FocalLoss
+from mt_structure_classification.utils.device import get_device
 
 @dataclass
 class TrainConfig:
@@ -66,7 +67,7 @@ def train_classifier(
     val_loader = DataLoader(val_ds, batch_size=train_cfg.batch_size, shuffle=False,
                             num_workers=train_cfg.num_workers, pin_memory=True)
 
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    device = get_device()
     model = build_efficientnet_b0(num_classes=len(label_to_index), pretrained=True).to(device)
 
     criterion = FocalLoss(alpha=1.0, gamma=2.0)

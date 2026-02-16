@@ -1,29 +1,18 @@
+# macOS (Apple Silicon / MPS) and CPU-only Linux
+# For NVIDIA GPU, use environment-cuda.yml instead.
 name: mt_structure_classification
 channels:
   - pytorch
-  - nvidia
   - conda-forge
-  - defaults
 
 dependencies:
   - python=3.11
   - pip
-  - pytorch>=2.0
-  - torchvision
-  - torchaudio
-  - pytorch-cuda=12.4
-  - numpy
-  - pandas
-  - matplotlib
-  - scikit-image
-  - tifffile
-  - scipy
-  - pillow
-  - scikit-learn
-  - tqdm
+
+  # conda handles platform-specific PyTorch builds
+  - pytorch::pytorch>=2.0
+  - pytorch::torchvision>=0.15
+
+  # everything else comes from pyproject.toml via pip
   - pip:
-      - opencv-python
-      - csbdeep
-      - stardist
-      - cellpose==3.1.1.2
       - -e .

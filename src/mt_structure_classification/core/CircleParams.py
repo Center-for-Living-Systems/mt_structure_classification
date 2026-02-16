@@ -3,7 +3,10 @@ import numpy as np
 from skimage import filters
 from skimage.filters import median
 from skimage.morphology import disk
-from csbdeep.utils import normalize
+def _percentile_normalize(x, pmin=2, pmax=99.8):
+    """Percentile-based normalization (replaces csbdeep.utils.normalize)."""
+    lo, hi = np.percentile(x, pmin), np.percentile(x, pmax)
+    return (x - lo) / (hi - lo + 1e-20)
 
 @dataclass
 class CircleParams:
@@ -46,7 +49,7 @@ def segment_circles(
     """
     # smooth + normalize
     guv_smooth = filters.gaussian(guv_img, params.sigma)
-    guv_norm = normalize(guv_smooth, 1, 99)
+    guv_norm = _percentile_normalize(guv_smooth, 1, 99)
     guv_u8 = cv2.normalize(guv_norm, None, 0, 255, cv2.NORM_MINMAX)
     guv_u8 = cv2.GaussianBlur(guv_u8, (5, 5), sigmaX=1)
     guv_u8 = np.uint8(guv_u8)
