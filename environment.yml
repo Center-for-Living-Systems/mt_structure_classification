@@ -3,11 +3,12 @@ channels:
   - pytorch
   - nvidia
   - conda-forge
+  - defaults
 
 dependencies:
   - python=3.11
   - pip
-  - pytorch
+  - pytorch>=2.0
   - torchvision
   - torchaudio
   - pytorch-cuda=12.4
@@ -16,13 +17,13 @@ dependencies:
   - matplotlib
   - scikit-image
   - tifffile
-  - csbdeep
   - scipy
   - pillow
   - scikit-learn
   - tqdm
-  - opencv
   - pip:
+      - opencv-python
+      - csbdeep
+      - stardist
       - cellpose==3.1.1.2
       - -e .
-

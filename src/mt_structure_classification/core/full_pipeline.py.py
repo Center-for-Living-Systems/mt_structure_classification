@@ -1,31 +1,28 @@
 # src/mt_structure_classification/core/pipeline.py
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Literal, Optional
+from typing import Any, Literal, Optional, Sequence
 
 import numpy as np
 import pandas as pd
-
 
 # ---------- local imports (package-internal) ----------
 from mt_structure_classification.utils.filesystem import ensure_dir
 
 # indexing / pairing + stacking + background
-from mt_structure_classification.dataset.image_files_indexing import (
-    build_pairs_dataframe_flexible,
-)
+from mt_structure_classification.dataset.image_files_indexing import build_pairs_dataframe_flexible
 from mt_structure_classification.utils.image_processing import (
     stack_pairs_to_arrays,
     compute_background_median,
-    remove_background_and_pad,  # you likely want this helper (see note below)
+    remove_background_and_pad,
 )
 
 # segmentation backends
 from mt_structure_classification.utils.GUV_mt_segmentation import (
     segment_guv_cellpose,
-    segment_guv_hough_circles,
+    segment_guv_hough_circles,  # UPDATED usage (scales list)
     combine_segmentations,
     crop_objects_from_masks_or_circles,
 )
@@ -49,6 +46,20 @@ class PreprocessConfig:
     nan_for_zero: bool = True
     save_intermediates: bool = True
 
+    # background-pad behavior
+    pad: int = 64
+
+
+@dataclass(frozen=True)
+class HoughScale:
+    """One HoughCircles pass (e.g. small/med/large)."""
+    name: str
+    minDist: int
+    param1: int
+    param2: int
+    minRadius: int
+    maxRadius: int
+
 
 @dataclass(frozen=True)
 class SegmentationConfig:
@@ -64,41 +75,27 @@ class SegmentationConfig:
     cellpose_channels: tuple[int, int] = (0, 0)
 
     # circle/hough params (only used if method includes circle)
-    # these map well to what you had in the notebook (small/med/large groups)
     hough_dp: float = 1.1
-    hough_minDist_small: int = 20
-    hough_minDist_med: int = 40
-    hough_minDist_large: int = 60
-
-    hough_param1_small: int = 30
-    hough_param2_small: int = 30
-    hough_minRadius_small: int = 10
-    hough_maxRadius_small: int = 30
-    
-    hough_param1_med: int = 25
-    hough_param2_med: int = 40
-    hough_minRadius_med: int = 30
-    hough_maxRadius_med: int = 60
-   
-    hough_param1_large: int = 20
-    hough_param2_large: int = 60
-    hough_minRadius_large: int = 60
-    hough_maxRadius_large: int = 90
+    hough_scales: tuple[HoughScale, ...] = (
+        HoughScale("small", minDist=20, param1=30, param2=30, minRadius=10, maxRadius=30),
+        HoughScale("med",   minDist=40, param1=25, param2=40, minRadius=30, maxRadius=60),
+        HoughScale("large", minDist=60, param1=20, param2=60, minRadius=60, maxRadius=90),
+    )
 
     # filtering rules you used (MT std checks etc.)
     mt_bg_int: float = 120.0
     mt_std_threshold: float = 15.0
 
+    # optional extra filters you might implement later
+    # e.g. reject circles too close to each other / duplicates
+    dedup_center_dist_px: int = 15
+
 
 @dataclass(frozen=True)
 class TrainingConfig:
-    # dataset csv (filename,label)
     labeled_csv: str | Path
-
-    # images root folder (the cropped object PNGs)
     image_dir: str | Path
 
-    # core training choices
     model_name: str = "efficientnet_b0"
     batch_size: int = 32
     lr: float = 3e-4
@@ -107,7 +104,6 @@ class TrainingConfig:
     patience: int = 30
     dropout: float = 0.3
 
-    # misc
     seed: int = 42
     val_split: float = 0.2
 
@@ -178,18 +174,10 @@ def run_segmentation_pipeline(
       - per-object crops (png/tif)
       - per-object metadata CSV (centers/radius or mask regionprops)
       - optional debug panels
-
-    Notes:
-    - This pipeline assumes backgrounds were computed (or can be computed from df).
-    - It supports 3 modes:
-        seg.method="cellpose"  -> mask-based
-        seg.method="circle"    -> circle-based (Hough)
-        seg.method="combined"  -> merge cellpose mask + circles (you define strategy)
     """
     out_root = ensure_dir(output_folder)
     processed = ensure_dir(out_root / dataset_name / "processed_MT")
 
-    # standard output locations (you can rename later)
     seg_root = ensure_dir(processed / f"segmentation_{seg.method}")
     debug_dir = ensure_dir(seg_root / "debug") if seg.save_debug_panels else None
     crops_dir = ensure_dir(seg_root / "crops_png")
@@ -207,15 +195,13 @@ def run_segmentation_pipeline(
     guv_bg = compute_background_median(guv_stack, disk_radius=preprocess.disk_radius)
     mt_bg = compute_background_median(mt_stack, disk_radius=preprocess.disk_radius)
 
-    # Background removal / padding (your notebook did this; keep it as a single helper)
-    # remove_background_and_pad should return padded arrays and bg-int estimates if needed.
-    # If you don’t have it yet, implement it in utils/image_processing.py
+    # Background removal / padding
     guv_pad, mt_pad = remove_background_and_pad(
         guv_stack,
         mt_stack,
         guv_bg=guv_bg,
         mt_bg=mt_bg,
-        pad=64,
+        pad=preprocess.pad,
     )
 
     all_objects: list[pd.DataFrame] = []
@@ -238,38 +224,24 @@ def run_segmentation_pipeline(
             )
 
         if seg.method in ("circle", "combined"):
+            # UPDATED: pass the scale list instead of 3 separate parameter groups
             circles = segment_guv_hough_circles(
                 guv,
+                mt_img=mt,
                 sigma_smooth=seg.sigma_smooth,
                 dp=seg.hough_dp,
-                minDist_small=seg.hough_minDist_small,
-                minDist_med=seg.hough_minDist_med,
-                minDist_large=seg.hough_minDist_large,
-                param1_small=seg.hough_param1_small,
-                param2_small=seg.hough_param2_small,
-                minRadius_small=seg.hough_minRadius_small,
-                maxRadius_small=seg.hough_maxRadius_small,
-                param1_med=seg.hough_param1_med,
-                param2_med=seg.hough_param2_med,
-                minRadius_med=seg.hough_minRadius_med,
-                maxRadius_med=seg.hough_maxRadius_med,
-                param1_large=seg.hough_param1_large,
-                param2_large=seg.hough_param2_large,
-                minRadius_large=seg.hough_minRadius_large,
-                maxRadius_large=seg.hough_maxRadius_large,
-                mt_img=mt,
+                scales=seg.hough_scales,  # <-- the big change
                 mt_bg_int=seg.mt_bg_int,
                 mt_std_threshold=seg.mt_std_threshold,
+                dedup_center_dist_px=seg.dedup_center_dist_px,
             )
 
-        # unify into a single representation used for cropping
         objects = combine_segmentations(
             masks=masks_cellpose,
             circles=circles,
             method=seg.method,
         )
 
-        # crops + metadata rows
         obj_df = crop_objects_from_masks_or_circles(
             objects=objects,
             guv_img=guv,
@@ -303,10 +275,6 @@ def run_training_pipeline(
     output_folder: str | Path,
     experiment_name: str = "train_run",
 ) -> dict[str, object]:
-    """
-    Thin wrapper around core.train.train_classifier().
-    Keeps notebooks clean: you call this function and it handles outputs.
-    """
     out_root = ensure_dir(output_folder)
     exp_dir = ensure_dir(out_root / experiment_name)
 
@@ -324,8 +292,6 @@ def run_training_pipeline(
         seed=training.seed,
         val_split=training.val_split,
     )
-    # train_classifier should return at least:
-    # {"best_ckpt": "...pth", "label_map": {...}, "metrics": {...}, ...}
     return {"experiment_dir": str(exp_dir), **result}
 
 
@@ -368,13 +334,9 @@ def run_full_pipeline(
     training: Optional[TrainingConfig] = None,
     pred: Optional[PredictConfig] = None,
 ) -> dict[str, object]:
-    """
-    Convenience entry point for scripts/CLI.
-    """
     results: dict[str, object] = {}
 
-    if task in ("preprocess", "all", "segment", "train", "predict"):
-        # indexing is needed for preprocess/segment (and sometimes for logging)
+    if task in ("preprocess", "segment", "all"):
         preprocess_res = run_mt_guv_background_pipeline(
             root_folder=root_folder,
             output_folder=output_folder,
