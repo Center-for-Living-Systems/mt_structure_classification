@@ -1,7 +1,7 @@
 CONDA_ENV = mt_structure_classification
 RUN = conda run -n $(CONDA_ENV)
 
-.PHONY: env env-cuda install install-dev test test-slow lint format clean help
+.PHONY: env env-cuda install install-dev test test-cellpose test-cuda test-cuda-cellpose lint format clean help
 
 help:  ## Show this help
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-15s\033[0m %s\n", $$1, $$2}'
@@ -24,11 +24,29 @@ install-dev:  ## pip install with dev extras
 install-cpu:  ## pip install with torch CPU (no conda needed)
 	pip install -e ".[torch-cpu,dev]"
 
-test:  ## Run tests (fast — hough circles only)
-	$(RUN) pytest test/ -v
+# ── CPU tests ─────────────────────────────────────────────────────────────────
 
-test-slow:  ## Run all tests including cellpose (needs model download)
-	$(RUN) pytest test/ -v --runslow
+test:  ## Run fast tests on CPU (hough circles + classifier smoke test)
+	$(RUN) pytest test/test_pipeline_steps1to4.py test/test_pipeline_steps5to6.py -v \
+		-k "not cellpose" \
+		--device cpu
+
+test-cellpose:  ## Run all CPU tests including cellpose (needs model download)
+	$(RUN) pytest test/test_pipeline_steps1to4.py test/test_pipeline_steps5to6.py -v \
+		--runcellpose \
+		--device cpu
+
+# ── CUDA tests ────────────────────────────────────────────────────────────────
+
+test-cuda:  ## Run fast tests on CUDA GPU
+	$(RUN) pytest test/test_pipeline_steps1to4.py test/test_pipeline_steps5to6.py -v \
+		-k "not cellpose" \
+		--device cuda
+
+test-cuda-cellpose:  ## Run all tests on CUDA GPU including cellpose
+	$(RUN) pytest test/test_pipeline_steps1to4.py test/test_pipeline_steps5to6.py -v \
+		--runcellpose \
+		--device cuda
 
 lint:  ## Run ruff linter
 	$(RUN) ruff check src/ test/ scripts/

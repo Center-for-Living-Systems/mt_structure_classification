@@ -24,7 +24,7 @@ import pandas as pd
 import pytest
 
 # ── test data root (bundled in repo) ──
-TEST_DATA_ROOT = Path(__file__).parent / "Microtubule_GUV-Liu"
+TEST_DATA_ROOT = Path(__file__).parent / "segmentation_test_data" / "Microtubule_GUV-Liu"
 
 # ── segmentation params ──
 MT_STD_THRESHOLD = 15.0
@@ -241,7 +241,7 @@ class TestStep3HoughSegmentation:
 # ============================================================
 
 
-@pytest.mark.slow
+@pytest.mark.cellpose
 class TestStep3CellposeSegmentation:
     def test_cellpose_runs(self, background_and_stats):
         from mt_structure_classification.utils.GUV_mt_segmentation import (
