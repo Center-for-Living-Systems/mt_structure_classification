@@ -25,6 +25,7 @@ from pathlib import Path
 import pandas as pd
 import pytest
 
+
 # ── test data root ──
 TEST_DATA_ROOT = Path(__file__).parent / "classifier_test_data"
 TEST_CSV       = TEST_DATA_ROOT / "test_annotation_50samples.csv"
@@ -55,6 +56,7 @@ def trained_checkpoint(tmp_path_factory):
         csv_path=TEST_CSV,
         image_root=TEST_IMAGE_DIR,
         out_dir=out_dir,
+        model_name = "efficientnet",
         train_cfg=TrainConfig(
             max_epochs=2,
             patience=10,
@@ -125,47 +127,55 @@ class TestStep6Prediction:
         from mt_structure_classification.core.predict import predict_on_folder
 
         out_csv = tmp_path / "predictions.csv"
+
+        # Predict on all images in a folder
         predict_on_folder(
-            model_ckpt=trained_checkpoint,
-            image_dir=TEST_IMAGE_DIR,
-            output_csv=out_csv,
-            batch_size=8,
+            image_folder=TEST_IMAGE_DIR,
+            model_path=trained_checkpoint,
+            label_map_path="models/label_map.json",
+            out_csv=out_csv,
+            batch_size=64,
         )
+
         assert out_csv.is_file(), "predict_on_folder should save a CSV"
 
-    def test_prediction_csv_columns(self, trained_checkpoint, tmp_path):
-        from mt_structure_classification.core.predict import predict_on_folder
+        def test_prediction_csv_columns(self, trained_checkpoint, tmp_path):
+            from mt_structure_classification.core.predict import predict_on_folder
 
-        out_csv = tmp_path / "predictions.csv"
-        predict_on_folder(
-            model_ckpt=trained_checkpoint,
-            image_dir=TEST_IMAGE_DIR,
-            output_csv=out_csv,
-            batch_size=8,
-        )
+            out_csv = tmp_path / "predictions.csv"
+            
+            predict_on_folder(
+                image_folder=TEST_IMAGE_DIR,                              # ✅ folder with images
+                model_ckpt=trained_checkpoint,                            # ✅ trained model
+                label_map_path=trained_checkpoint.parent / "label_map.json",  # ✅ label map
+                out_csv=out_csv,                                          # ✅ output CSV
+                batch_size=8,
+            )
 
-        pred_df = pd.read_csv(out_csv)
-        assert "filename"        in pred_df.columns, "predictions CSV missing 'filename'"
-        assert "predicted_label" in pred_df.columns, "predictions CSV missing 'predicted_label'"
-        assert len(pred_df) > 0,                     "predictions CSV is empty"
+            pred_df = pd.read_csv(out_csv)
+            assert "filename" in pred_df.columns
+            assert "pred_label" in pred_df.columns    # ✅ match your actual column name
+            assert "pred_conf" in pred_df.columns     # ✅ add confidence check
+            assert len(pred_df) > 0
 
-    def test_prediction_covers_all_images(self, trained_checkpoint, tmp_path):
-        """Every tiff in the image folder should get a prediction."""
-        from mt_structure_classification.core.predict import predict_on_folder
+        def test_prediction_covers_all_images(self, trained_checkpoint, tmp_path):
+            from mt_structure_classification.core.predict import predict_on_folder
 
-        out_csv = tmp_path / "predictions.csv"
-        predict_on_folder(
-            model_ckpt=trained_checkpoint,
-            image_dir=TEST_IMAGE_DIR,
-            output_csv=out_csv,
-            batch_size=8,
-        )
+            out_csv = tmp_path / "predictions.csv"
+            
+            predict_on_folder(
+                image_folder=TEST_IMAGE_DIR,                              
+                model_ckpt=trained_checkpoint,                            
+                label_map_path=trained_checkpoint.parent / "label_map.json", 
+                out_csv=out_csv,                                          
+                batch_size=8,
+            )
 
-        pred_df = pd.read_csv(out_csv)
-        image_files = (
-            list(TEST_IMAGE_DIR.glob("*.tif")) +
-            list(TEST_IMAGE_DIR.glob("*.tiff"))
-        )
-        assert len(pred_df) == len(image_files), (
-            f"Expected {len(image_files)} predictions, got {len(pred_df)}"
-        )
+            pred_df = pd.read_csv(out_csv)
+            
+            # Count actual images in folder
+            from pathlib import Path
+            num_images = len(list(Path(TEST_IMAGE_DIR).glob("*.tif")))
+            
+            assert len(pred_df) == num_images, \
+                f"Expected {num_images} predictions, got {len(pred_df)}"

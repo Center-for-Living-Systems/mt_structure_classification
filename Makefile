@@ -24,6 +24,21 @@ install-dev:  ## pip install with dev extras
 install-cpu:  ## pip install with torch CPU (no conda needed)
 	pip install -e ".[torch-cpu,dev]"
 
+
+
+# ── per group tests ─────────────────────────────────────────────────────────────────
+
+test-segmentation:  ## Run segmentation tests only (steps 1-4)
+	$(RUN) pytest test/test_pipeline_steps1to4.py -v --device cpu
+
+test-training:  ## Run training/prediction tests only (steps 5-6)
+	$(RUN) pytest test/test_pipeline_steps5to6.py -v --device cpu
+
+
+test-training:  ## Run training/prediction tests only (steps 5-6)
+	$(RUN) pytest test/test_pipeline_steps5to6.py -v --device cuda
+
+
 # ── CPU tests ─────────────────────────────────────────────────────────────────
 
 test:  ## Run fast tests on CPU (hough circles + classifier smoke test)

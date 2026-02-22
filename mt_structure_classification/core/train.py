@@ -10,7 +10,7 @@ import torch.optim as optim
 from sklearn.model_selection import train_test_split
 from torch.utils.data import DataLoader
 
-from mt_structure_classification.core.model import FocalLoss, build_efficientnet_b0
+from mt_structure_classification.core.model import FocalLoss, initialize_model
 from mt_structure_classification.dataset.dataset import (
     ClassifyConfig,
     ImageCSVDataset,
@@ -39,6 +39,7 @@ def train_classifier(
     csv_path: str | Path,
     image_root: str | Path,
     out_dir: str | Path,
+    model_name: str = "efficientnet",
     cls_cfg: ClassifyConfig | None = None,
     train_cfg: TrainConfig | None = None,
     label_col: str = "label",
@@ -77,7 +78,7 @@ def train_classifier(
                             num_workers=train_cfg.num_workers, pin_memory=True)
 
     device = get_device()
-    model = build_efficientnet_b0(num_classes=len(label_to_index), pretrained=True).to(device)
+    model = initialize_model(model_name=model_name, num_classes=len(label_to_index), device=device)
 
     criterion = FocalLoss(alpha=1.0, gamma=2.0)
     optimizer = optim.AdamW(model.parameters(), lr=train_cfg.lr, weight_decay=train_cfg.weight_decay)

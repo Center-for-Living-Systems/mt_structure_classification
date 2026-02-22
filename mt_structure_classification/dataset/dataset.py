@@ -7,7 +7,8 @@ import pandas as pd
 import torchvision.transforms as T
 from PIL import Image
 from torch.utils.data import Dataset
-
+import tifffile
+import numpy as np
 
 @dataclass(frozen=True)
 class ClassifyConfig:
@@ -67,7 +68,27 @@ class ImageCSVDataset(Dataset):
         if not img_path.is_absolute():
             img_path = self.root_dir / img_path
 
-        image = Image.open(img_path).convert("RGB")
+        if img_path.suffix.lower() in ['.tif', '.tiff']:
+            image = tifffile.imread(str(img_path))
+
+            if image.ndim == 2:  # grayscale
+                image = np.stack([image]*3, axis=-1)
+
+            # Convert to uint8 for PIL (handles float16, float32, etc.)
+            if image.dtype in [np.float16, np.float32, np.float64]:
+                # Normalize to [0, 1] then scale to [0, 255]
+                image = np.clip(image, 0, 1)
+                image = (image * 255).astype(np.uint8)
+            elif image.dtype != np.uint8:
+                # Other dtypes: just cast
+                image = image.astype(np.uint8)
+
+            image = Image.fromarray(image)
+            
+        else:
+            image = Image.open(img_path).convert("RGB")
+
+
         if self.transform:
             image = self.transform(image)
 
