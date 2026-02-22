@@ -50,8 +50,9 @@ DEFAULT_HOUGH_SCALES: tuple[HoughCircleConfig, ...] = (
 def get_cellpose_model(
     model_type: str = "cyto3",
     gpu: bool = False,
-) -> models.Cellpose:
-    return models.Cellpose(gpu=gpu, model_type=model_type)
+):
+    from cellpose import models
+    return models.CellposeModel(gpu=gpu, model_type=model_type)  
 
 
 def _upsample_labels(labels_small: np.ndarray, target_h: int, target_w: int) -> np.ndarray:
@@ -188,13 +189,22 @@ def segment_guv_cellpose(
     guv_mt_img[0] = guv_img_norm
     guv_mt_img[1] = mt_img_norm
 
+    
     model = get_cellpose_model(model_type=model_type, gpu=gpu)
-    masks_small, _, _, _ = model.eval(
+    result = model.eval(
         guv_mt_img[:, ::2, ::2],
         diameter=diameter,
         channels=channels,
         **kwargs,
     )
+    
+    # Handle both old (4 values) and new (3 values) API
+    if len(result) == 4:
+        masks_small, _, _, _ = result  # v2.x
+    else:
+        masks_small, _, _ = result      # v4.x
+
+
 
     # upsample back to full resolution
     label_mask = _upsample_labels(masks_small, h, w)
