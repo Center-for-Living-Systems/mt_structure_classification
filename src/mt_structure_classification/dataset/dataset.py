@@ -1,13 +1,12 @@
 from __future__ import annotations
+
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict, Optional
 
 import pandas as pd
-import torch
-from torch.utils.data import Dataset
-from PIL import Image
 import torchvision.transforms as T
+from PIL import Image
+from torch.utils.data import Dataset
 
 
 @dataclass(frozen=True)
@@ -38,7 +37,7 @@ class ImageCSVDataset(Dataset):
         df: pd.DataFrame,
         root_dir: str | Path,
         transform=None,
-        label_to_index: Optional[Dict[str, int]] = None,
+        label_to_index: dict[str, int] | None = None,
         filename_col: str = "filename",
         label_col: str = "label",
         allow_missing_labels: bool = False,

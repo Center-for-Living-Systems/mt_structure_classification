@@ -1,16 +1,16 @@
 import torch
 import torch.nn as nn
-import torchvision.transforms as transforms
 import torchvision.models as models
-from torchvision import models
+import torchvision.transforms as transforms
 from torchvision.models import EfficientNet_B0_Weights
+
 
 # Function to initialize different models
 def initialize_model(model_name, num_classes, device):
     if model_name == "efficientnet":
         weights = EfficientNet_B0_Weights.IMAGENET1K_V1
         model = models.efficientnet_b0(weights=weights)
-        
+
         num_ftrs = model.classifier[1].in_features
         model.classifier[1] = nn.Sequential(
             nn.Dropout(0.3),

@@ -1,0 +1,20 @@
+# Linux with NVIDIA CUDA GPU
+# For macOS or CPU-only, use environment.yml instead.
+name: mt_structure_classification
+channels:
+  - pytorch
+  - nvidia
+  - conda-forge
+
+dependencies:
+  - python=3.11
+  - pip
+
+  # conda handles platform-specific PyTorch builds
+  - pytorch::pytorch>=2.0
+  - pytorch::torchvision>=0.15
+  - pytorch-cuda=12.4
+
+  # everything else comes from pyproject.toml via pip
+  - pip:
+      - -e .

@@ -1,15 +1,15 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any
 
-import numpy as np
 import matplotlib
-matplotlib.use("Agg")  # non-interactive — safe for scripts and notebooks
-import matplotlib.pyplot as plt
-import matplotlib.patches as mpatches
-import tifffile
+import numpy as np
 
+matplotlib.use("Agg")  # non-interactive — safe for scripts and notebooks
+import matplotlib.patches as mpatches
+import matplotlib.pyplot as plt
+import tifffile
 
 # ============================================================
 #                        HELPERS
@@ -77,8 +77,8 @@ def plot_preprocessing_panel(
     image_index: int,
     title: str,
     out_path: str | Path,
-    guv_vmax: float = None,
-    mt_vmax: float = None,
+    guv_vmax: float | None = None,
+    mt_vmax: float | None = None,
 ) -> None:
     """
     4-row × 2-col preprocessing diagnostic panel saved per image.
@@ -332,7 +332,6 @@ def plot_final_objects(
         overlay = _make_label_overlay(label_mask, alpha=0.5)
         ax.imshow(overlay, interpolation="None")
 
-        props = {}
         try:
             from skimage.measure import regionprops
             for region in regionprops(label_mask):

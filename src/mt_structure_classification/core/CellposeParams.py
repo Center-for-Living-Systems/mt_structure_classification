@@ -1,12 +1,25 @@
+from __future__ import annotations
+
+from dataclasses import dataclass
+
+import numpy as np
+
+from mt_structure_classification.core.SegObject import SegObject
+
+
 @dataclass
 class CellposeParams:
     model_type: str = "cyto2"   # or your pretrained model
     diameter: float | None = None
     channels: tuple[int, int] = (0, 0)  # adjust if using multi-channel
 
+
+_DEFAULT_CELLPOSE_PARAMS = CellposeParams()
+
+
 def segment_cellpose(
     guv_img: np.ndarray,
-    params: CellposeParams = CellposeParams(),
+    params: CellposeParams | None = None,
 ) -> list[SegObject]:
     """
     Return instance masks as SegObject list.
@@ -14,8 +27,11 @@ def segment_cellpose(
     from cellpose import models
     from skimage.measure import regionprops
 
+    if params is None:
+        params = _DEFAULT_CELLPOSE_PARAMS
+
     model = models.Cellpose(model_type=params.model_type)
-    masks, flows, styles, diams = model.eval(
+    masks, _flows, _styles, _diams = model.eval(
         guv_img,
         diameter=params.diameter,
         channels=params.channels,
@@ -26,7 +42,7 @@ def segment_cellpose(
     for rp in regionprops(masks):
         y0, x0, y1, x1 = rp.bbox
         cy, cx = rp.centroid
-        inst_mask = (masks == rp.label)
+        inst_mask = masks == rp.label
 
         # approximate radius from area (optional)
         radius = float(np.sqrt(rp.area / np.pi))

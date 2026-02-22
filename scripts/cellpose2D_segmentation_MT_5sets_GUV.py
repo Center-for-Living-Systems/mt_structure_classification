@@ -1,4 +1,6 @@
 if __name__ == "__main__":
+    from mt_structure_classification.core.full_pipeline import run_mt_guv_background_pipeline
+
     root_folder = "/mnt/d/lding/CLS/mousumiLiuDinner/raw_data/Microtubule_GUV-Liu-20250106T211105Z-001"
     output_folder = "/mnt/d/lding/CLS/mousumiLiuDinner/set1to5_processed_results"
     dataset_name = "Microtubule_GUV-Liu-20250106T211105Z-001"

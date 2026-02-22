@@ -13,24 +13,29 @@ authors = [
   { name = "Liya Ding" }
 ]
 
+# torch & torchvision are installed by conda (platform-specific: CUDA vs MPS).
+# They are NOT listed here to avoid pip installing an incompatible build.
 dependencies = [
   "numpy",
   "pandas",
   "matplotlib",
+  "seaborn",
   "scikit-image",
   "opencv-python",
   "tifffile",
-  "csbdeep",
   "scipy",
   "pillow",
   "scikit-learn",
-  "torch",
-  "torchvision",
   "tqdm",
   "cellpose==3.1.1.2",
 ]
 
 [project.optional-dependencies]
+# For pure-pip installs (CI, Docker) where conda is not used:
+torch-cpu = [
+  "torch>=2.0",
+  "torchvision>=0.15",
+]
 dev = [
   "pytest",
   "ruff",
@@ -52,6 +57,31 @@ where = ["src"]
 [tool.ruff]
 line-length = 100
 target-version = "py310"
+
+[tool.ruff.lint]
+select = [
+  "E",      # pycodestyle errors
+  "W",      # pycodestyle warnings
+  "F",      # pyflakes
+  "I",      # isort
+  "UP",     # pyupgrade
+  "B",      # flake8-bugbear
+  "SIM",    # flake8-simplify
+  "RUF",    # ruff-specific
+]
+ignore = [
+  "E501",   # line too long (handled by formatter)
+  "E741",   # ambiguous variable name (common in scientific code: l, I, O)
+  "B905",   # zip strict (not needed for scientific code)
+  "RUF002", # ambiguous unicode in docstrings (× is fine)
+  "RUF003", # ambiguous unicode in comments (× is fine)
+]
+
+[tool.ruff.lint.isort]
+known-first-party = ["mt_structure_classification"]
+
+[tool.ruff.format]
+quote-style = "double"
 
 [tool.black]
 line-length = 100

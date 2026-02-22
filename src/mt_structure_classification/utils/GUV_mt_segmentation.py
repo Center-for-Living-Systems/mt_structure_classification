@@ -1,23 +1,23 @@
 from __future__ import annotations
 
+import contextlib
+from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Literal, Optional, Sequence
+from typing import Any, Literal
 
+import cv2
 import numpy as np
 import pandas as pd
-import cv2
+import tifffile
+from cellpose import models
 from scipy.spatial.distance import cdist
 from skimage.filters import gaussian
-from skimage.morphology import disk
 from skimage.filters.rank import median as median_rank
-
-from cellpose import models
-import tifffile
 from skimage.measure import regionprops
+from skimage.morphology import disk
 
 from mt_structure_classification.utils.image_processing import crop_circle_patch, crop_mask_patch
-
 
 SegMethod = Literal["cellpose", "circle", "combined"]
 
@@ -109,10 +109,6 @@ def filter_cellpose_masks(
         idx = region.label - 1  # 0-based index into bad_flags
 
         # shape filters
-        print("features:")
-        print(region.eccentricity)
-        print(region.area)
-                
         if (region.eccentricity > max_eccentricity
                 or region.area < min_area
                 or region.area > max_area):
@@ -122,8 +118,6 @@ def filter_cellpose_masks(
 
         # MT signal filter
         img_content = mt_med[label_mask == region.label]
-        print("content:")
-        print(img_content)
         img_content = img_content[img_content > mt_bg_int]
         if img_content.size == 0:
             bad_flags[idx] = 2
@@ -131,8 +125,6 @@ def filter_cellpose_masks(
             continue
 
         # MT std filter (fixed threshold — matches notebook)
-        print("std:")
-        print(img_content.std())
         if img_content.std() < mt_std_threshold:
             bad_flags[idx] = 3
             label_mask[label_mask == region.label] = 0
@@ -146,7 +138,7 @@ def segment_guv_cellpose(
     mt_img_raw: np.ndarray,
     model_type: str = "cyto3",
     gpu: bool = True,
-    diameter: Optional[float] = None,
+    diameter: float | None = None,
     channels: tuple[int, int] = (0, 0),
     mt_bg_int: float = 0.0,   # set to 1st percentile of raw MT stack
     mt_std_threshold: float = 15.0,
@@ -326,11 +318,7 @@ def _bad_region_flags(
         stdv = float(content.std())
         npx  = int(content.size)
 
-        if stdv < mt_std_threshold and npx <= 3000:
-            flags[idx] = 4
-        elif stdv < 10 and 3000 < npx <= 5000:
-            flags[idx] = 4
-        elif stdv < 5 and npx > 5000:
+        if (stdv < mt_std_threshold and npx <= 3000) or (stdv < 10 and 3000 < npx <= 5000) or (stdv < 5 and npx > 5000):
             flags[idx] = 4
 
     return flags
@@ -558,9 +546,9 @@ def match_circles_to_masks(
     candidates: list[tuple[int, int, float]] = []
 
     for ci in range(good_circles.shape[0]):
-        cx = int(round(float(good_circles[ci, 0])))
-        cy = int(round(float(good_circles[ci, 1])))
-        r  = int(round(float(good_circles[ci, 2])))
+        cx = round(float(good_circles[ci, 0]))
+        cy = round(float(good_circles[ci, 1]))
+        r  = round(float(good_circles[ci, 2]))
         circle_mask = _circle_to_mask(cx, cy, r, h, w)
 
         for lab, lmask in label_masks.items():
@@ -578,7 +566,7 @@ def match_circles_to_masks(
     matched_labels:  set[int] = set()
     matches: list[tuple[int, int]] = []
 
-    for ci, lab, iou in candidates:
+    for ci, lab, _score in candidates:
         if ci in matched_circles or lab in matched_labels:
             continue
         matches.append((ci, lab))
@@ -590,8 +578,8 @@ def match_circles_to_masks(
 
 def combine_segmentations(
     *,
-    masks: Optional[np.ndarray],
-    circles: Optional[dict[str, Any]],
+    masks: np.ndarray | None,
+    circles: dict[str, Any] | None,
     method: SegMethod,
     iou_threshold: float = 0.5,
 ) -> dict[str, Any]:
@@ -698,18 +686,16 @@ def crop_objects_from_masks_or_circles(
 
     meta: dict[str, Any] = {}
     for col in meta_cols:
-        try:
+        with contextlib.suppress(Exception):
             meta[col] = source_row[col]
-        except Exception:
-            pass
 
     if "circles" in objects:
         circles = np.asarray(objects["circles"], dtype=np.float32)
 
         for k in range(circles.shape[0]):
-            cx = int(round(float(circles[k, 0])))
-            cy = int(round(float(circles[k, 1])))
-            radius = int(round(float(circles[k, 2])))
+            cx = round(float(circles[k, 0]))
+            cy = round(float(circles[k, 1]))
+            radius = round(float(circles[k, 2]))
 
             patch = crop_circle_patch(
                 mt_img, cx=cx, cy=cy, radius=radius,
@@ -741,11 +727,11 @@ def crop_objects_from_masks_or_circles(
             if ys.size == 0:
                 continue
 
-            cy = int(round(float(ys.mean())))
-            cx = int(round(float(xs.mean())))
+            cy = round(float(ys.mean()))
+            cx = round(float(xs.mean()))
             # radius stored for metadata only (not used for cropping)
-            radius = int(round(max(ys.max() - ys.min(),
-                                   xs.max() - xs.min()) / 2))
+            radius = round(max(ys.max() - ys.min(),
+                               xs.max() - xs.min()) / 2)
 
             patch = crop_mask_patch(
                 mt_img,
