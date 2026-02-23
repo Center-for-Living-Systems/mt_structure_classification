@@ -16,3 +16,13 @@ if __name__ == "__main__":
 
     print("Saved to:", results["processed_folder"])
     print("Pairs:", len(results["df"]))
+
+
+
+# Full run with Cellpose on GPU and diagnostic plots
+python mt_structure_classification/pipeline/run_segmentation_pipeline.py \
+    --data-root /mnt/d/lding/CLS/mousumiLiuDinner/raw_data/Microtubule_GUV-Liu \
+    --output-dir results/full_segmentation \
+    --method combined \
+    --cellpose-gpu \
+    --save-plots
