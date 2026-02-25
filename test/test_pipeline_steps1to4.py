@@ -169,7 +169,7 @@ class TestStep2Background:
 
 class TestStep3HoughSegmentation:
     def test_hough_circles_runs(self, background_and_stats):
-        from mt_structure_classification.utils.GUV_mt_segmentation import (
+        from mt_structure_classification.core.GUV_mt_segmentation import (
             DEFAULT_HOUGH_SCALES,
             segment_guv_hough_circles,
         )
@@ -201,7 +201,7 @@ class TestStep3HoughSegmentation:
             assert result["circles_all"].shape[1] == 3  # x, y, r
 
     def test_combine_circle_only(self, background_and_stats):
-        from mt_structure_classification.utils.GUV_mt_segmentation import (
+        from mt_structure_classification.core.GUV_mt_segmentation import (
             DEFAULT_HOUGH_SCALES,
             combine_segmentations,
             segment_guv_hough_circles,
@@ -244,7 +244,7 @@ class TestStep3HoughSegmentation:
 @pytest.mark.cellpose
 class TestStep3CellposeSegmentation:
     def test_cellpose_runs(self, background_and_stats):
-        from mt_structure_classification.utils.GUV_mt_segmentation import (
+        from mt_structure_classification.core.GUV_mt_segmentation import (
             segment_guv_cellpose,
         )
 
@@ -288,7 +288,7 @@ class TestStep3CellposeSegmentation:
 
 class TestStep4Cropping:
     def test_crop_from_hough(self, background_and_stats, tmp_path, indexed_pairs):
-        from mt_structure_classification.utils.GUV_mt_segmentation import (
+        from mt_structure_classification.core.GUV_mt_segmentation import (
             DEFAULT_HOUGH_SCALES,
             combine_segmentations,
             crop_objects_from_masks_or_circles,
@@ -346,7 +346,7 @@ class TestStep4Cropping:
 
     def test_all_images_process(self, background_and_stats, tmp_path, indexed_pairs):
         """Run the full pipeline loop over all 5 test images."""
-        from mt_structure_classification.utils.GUV_mt_segmentation import (
+        from mt_structure_classification.core.GUV_mt_segmentation import (
             DEFAULT_HOUGH_SCALES,
             combine_segmentations,
             crop_objects_from_masks_or_circles,

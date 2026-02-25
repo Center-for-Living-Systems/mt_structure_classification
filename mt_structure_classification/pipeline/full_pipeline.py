@@ -1,4 +1,8 @@
-# src/mt_structure_classification/core/pipeline.py
+# Full pipeline orchestration (steps 1-6) with config dataclasses.
+# For CLI entry points that reproduce paper results, use scripts in the repo:
+#   scripts/run_segmentation_pipeline.py (steps 1-4)
+#   scripts/run_training.py (step 5)
+#   scripts/run_prediction.py (step 6)
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -9,31 +13,27 @@ import numpy as np
 import pandas as pd
 
 from mt_structure_classification.core.predict import predict_on_folder
-
-# training + inference
-from mt_structure_classification.core.train import train_classifier
-
-# indexing / pairing + stacking + background
+from mt_structure_classification.core.train import TrainConfig, train_classifier
 from mt_structure_classification.dataset.image_files_indexing import build_pairs_dataframe_flexible
-
-# ---------- local imports (package-internal) ----------
 from mt_structure_classification.utils.filesystem import ensure_dir
-
-# segmentation backends
-from mt_structure_classification.utils.GUV_mt_segmentation import (
+from mt_structure_classification.core.GUV_mt_segmentation import (
+    DEFAULT_HOUGH_SCALES,
     combine_segmentations,
     crop_objects_from_masks_or_circles,
     segment_guv_cellpose,
-    segment_guv_hough_circles,  # UPDATED usage (scales list)
+    segment_guv_hough_circles,
 )
 from mt_structure_classification.utils.image_processing import (
     compute_background_median,
+    compute_channel_statistics,
     remove_background_and_pad,
     stack_pairs_to_arrays,
 )
 
 SegMethod = Literal["cellpose", "circle", "combined"]
 Task = Literal["preprocess", "segment", "train", "predict", "all"]
+
+PATCH_SIZE = 96
 
 
 # ======================================================
@@ -45,8 +45,6 @@ class PreprocessConfig:
     disk_radius: int = 5
     nan_for_zero: bool = True
     save_intermediates: bool = True
-
-    # background-pad behavior
     pad: int = 64
 
 
@@ -64,48 +62,37 @@ class HoughScale:
 @dataclass(frozen=True)
 class SegmentationConfig:
     method: SegMethod = "cellpose"
-
-    # common
     sigma_smooth: float = 1.0
     save_debug_panels: bool = True
-
-    # cellpose params (only used if method includes cellpose)
     cellpose_model: str = "cyto2"
     cellpose_diameter: float | None = None
     cellpose_channels: tuple[int, int] = (0, 0)
-
-    # circle/hough params (only used if method includes circle)
     hough_dp: float = 1.1
     hough_scales: tuple[HoughScale, ...] = (
         HoughScale("small", minDist=20, param1=30, param2=30, minRadius=10, maxRadius=30),
         HoughScale("med",   minDist=40, param1=25, param2=40, minRadius=30, maxRadius=60),
         HoughScale("large", minDist=60, param1=20, param2=60, minRadius=60, maxRadius=90),
     )
-
-    # filtering rules you used (MT std checks etc.)
     mt_bg_int: float = 120.0
     mt_std_threshold: float = 15.0
-
-    # optional extra filters you might implement later
-    # e.g. reject circles too close to each other / duplicates
     dedup_center_dist_px: int = 15
+    max_eccentricity: float = 0.5
+    min_area: int = 1000
+    max_area: int = 40000
 
 
 @dataclass(frozen=True)
 class TrainingConfig:
     labeled_csv: str | Path
     image_dir: str | Path
-
-    model_name: str = "efficientnet_b0"
+    model_name: str = "efficientnet"
     batch_size: int = 32
     lr: float = 3e-4
     weight_decay: float = 1e-4
     num_epochs: int = 200
     patience: int = 30
-    dropout: float = 0.3
-
+    num_workers: int = 4
     seed: int = 42
-    val_split: float = 0.2
 
 
 @dataclass(frozen=True)
@@ -113,6 +100,7 @@ class PredictConfig:
     model_ckpt: str | Path
     image_dir: str | Path
     output_csv: str | Path
+    label_map_path: str | Path | None = None  # default: model_ckpt.parent / "label_map.json"
     batch_size: int = 32
 
 
@@ -128,15 +116,30 @@ def run_mt_guv_background_pipeline(
     output_folder: str | Path,
     dataset_name: str,
     preprocess: PreprocessConfig | None = None,
+    target_shape: tuple[int, int] | None = None,
+    disk_radius: int = 5,
+    save_intermediates: bool = True,
 ) -> dict[str, object]:
     """
-    1) index pairs -> df
-    2) stack images
-    3) compute background images
-    4) save outputs
+    Steps 1-2: Index pairs -> stack -> compute background images -> save.
+    Accepts either preprocess config or legacy kwargs (target_shape, disk_radius, save_intermediates).
     """
     if preprocess is None:
-        preprocess = _DEFAULT_PREPROCESS
+        preprocess = PreprocessConfig(
+            target_shape=target_shape if target_shape is not None else _DEFAULT_PREPROCESS.target_shape,
+            disk_radius=disk_radius,
+            save_intermediates=save_intermediates,
+            nan_for_zero=_DEFAULT_PREPROCESS.nan_for_zero,
+            pad=_DEFAULT_PREPROCESS.pad,
+        )
+    elif target_shape is not None:
+        preprocess = PreprocessConfig(
+            target_shape=target_shape,
+            disk_radius=disk_radius,
+            save_intermediates=save_intermediates,
+            nan_for_zero=preprocess.nan_for_zero,
+            pad=preprocess.pad,
+        )
     out_root = ensure_dir(output_folder)
     processed_folder = ensure_dir(out_root / dataset_name / "processed_MT")
 
@@ -176,10 +179,8 @@ def run_segmentation_pipeline(
     preprocess: PreprocessConfig | None = None,
 ) -> dict[str, object]:
     """
-    Produces:
-      - per-object crops (png/tif)
-      - per-object metadata CSV (centers/radius or mask regionprops)
-      - optional debug panels
+    Steps 3-4: Segment GUVs (Hough and/or Cellpose) and crop 96x96 MT patches.
+    Uses same APIs as scripts/run_segmentation_pipeline.py and tests.
     """
     if seg is None:
         seg = _DEFAULT_SEGMENTATION
@@ -189,61 +190,77 @@ def run_segmentation_pipeline(
     processed = ensure_dir(out_root / dataset_name / "processed_MT")
 
     seg_root = ensure_dir(processed / f"segmentation_{seg.method}")
-    debug_dir = ensure_dir(seg_root / "debug") if seg.save_debug_panels else None
-    crops_dir = ensure_dir(seg_root / "crops_png")
-    crops_tif_dir = ensure_dir(seg_root / "crops_tif")
+    crops_dir = ensure_dir(seg_root / "crops_tif")
     meta_csv = seg_root / "objects.csv"
 
-    # Load & stack images once
     guv_stack, mt_stack = stack_pairs_to_arrays(
         df,
         target_shape=preprocess.target_shape,
         nan_for_zero=preprocess.nan_for_zero,
     )
 
-    # Backgrounds (compute here so segmentation is standalone)
     guv_bg = compute_background_median(guv_stack, disk_radius=preprocess.disk_radius)
     mt_bg = compute_background_median(mt_stack, disk_radius=preprocess.disk_radius)
+    stats = compute_channel_statistics(guv_stack, mt_stack)
+    mt_bg_intensity = float(stats["mt"]["bg_intensity"])
 
-    # Background removal / padding
     guv_pad, mt_pad = remove_background_and_pad(
         guv_stack,
         mt_stack,
         guv_bg=guv_bg,
         mt_bg=mt_bg,
+        guv_bg_intensity=stats["guv"]["bg_intensity"],
+        mt_bg_intensity=mt_bg_intensity,
         pad=preprocess.pad,
     )
 
     all_objects: list[pd.DataFrame] = []
+    guv_1p = stats["guv"]["norm_low"]
+    guv_99p = stats["guv"]["norm_high"]
+    mt_1p = stats["mt"]["norm_low"]
+    mt_99p = stats["mt"]["norm_high"]
 
-    # --- per-image segmentation ---
     for i in range(len(df)):
         row = df.iloc[i]
         guv = guv_pad[i]
         mt = mt_pad[i]
 
+        guv_norm = np.clip(
+            (guv - guv_1p) / max(guv_99p - guv_1p, 1e-6), 0, 1
+        ).astype(np.float32)
+        mt_norm = np.clip(
+            (mt - mt_1p) / max(mt_99p - mt_1p, 1e-6), 0, 1
+        ).astype(np.float32)
+
         masks_cellpose = None
         circles = None
 
         if seg.method in ("cellpose", "combined"):
-            masks_cellpose = segment_guv_cellpose(
-                guv,
+            masks_cellpose, _ = segment_guv_cellpose(
+                guv_norm,
+                mt_norm,
+                mt,
                 model_type=seg.cellpose_model,
+                gpu=False,
                 diameter=seg.cellpose_diameter,
                 channels=seg.cellpose_channels,
+                mt_bg_int=seg.mt_bg_int,
+                mt_std_threshold=seg.mt_std_threshold,
+                max_eccentricity=seg.max_eccentricity,
+                min_area=seg.min_area,
+                max_area=seg.max_area,
             )
 
         if seg.method in ("circle", "combined"):
-            # UPDATED: pass the scale list instead of 3 separate parameter groups
             circles = segment_guv_hough_circles(
-                guv,
+                guv_norm,
                 mt_img=mt,
                 sigma_smooth=seg.sigma_smooth,
                 dp=seg.hough_dp,
-                scales=seg.hough_scales,  # <-- the big change
+                hough_scales=DEFAULT_HOUGH_SCALES,
                 mt_bg_int=seg.mt_bg_int,
                 mt_std_threshold=seg.mt_std_threshold,
-                dedup_center_dist_px=seg.dedup_center_dist_px,
+                overlap_dist_thresh=float(seg.dedup_center_dist_px),
             )
 
         objects = combine_segmentations(
@@ -254,13 +271,12 @@ def run_segmentation_pipeline(
 
         obj_df = crop_objects_from_masks_or_circles(
             objects=objects,
-            guv_img=guv,
             mt_img=mt,
+            mt_bg_intensity=mt_bg_intensity,
             crops_dir=crops_dir,
-            crops_tif_dir=crops_tif_dir,
-            debug_dir=debug_dir,
             source_row=row,
             image_index=i,
+            patch_size=PATCH_SIZE,
         )
         all_objects.append(obj_df)
 
@@ -285,24 +301,27 @@ def run_training_pipeline(
     output_folder: str | Path,
     experiment_name: str = "train_run",
 ) -> dict[str, object]:
+    """Step 5: Train classifier. Uses core.train.train_classifier API."""
     out_root = ensure_dir(output_folder)
     exp_dir = ensure_dir(out_root / experiment_name)
 
-    result = train_classifier(
-        labeled_csv=training.labeled_csv,
-        image_dir=training.image_dir,
-        out_dir=exp_dir,
-        model_name=training.model_name,
+    train_cfg = TrainConfig(
         batch_size=training.batch_size,
         lr=training.lr,
         weight_decay=training.weight_decay,
-        num_epochs=training.num_epochs,
+        max_epochs=training.num_epochs,
         patience=training.patience,
-        dropout=training.dropout,
+        num_workers=training.num_workers,
         seed=training.seed,
-        val_split=training.val_split,
     )
-    return {"experiment_dir": str(exp_dir), **result}
+    ckpt = train_classifier(
+        csv_path=training.labeled_csv,
+        image_root=training.image_dir,
+        out_dir=exp_dir,
+        model_name=training.model_name,
+        train_cfg=train_cfg,
+    )
+    return {"experiment_dir": str(exp_dir), "checkpoint": ckpt}
 
 
 # ======================================================
@@ -314,6 +333,7 @@ def run_prediction_pipeline(
     output_folder: str | Path,
     run_name: str = "predict_run",
 ) -> dict[str, object]:
+    """Step 6: Predict on folder. Uses core.predict.predict_on_folder API."""
     out_root = ensure_dir(output_folder)
     run_dir = ensure_dir(out_root / run_name)
 
@@ -321,13 +341,18 @@ def run_prediction_pipeline(
     if not out_csv.is_absolute():
         out_csv = run_dir / out_csv
 
+    label_map = pred.label_map_path
+    if label_map is None:
+        label_map = Path(pred.model_ckpt).parent / "label_map.json"
+
     result = predict_on_folder(
-        model_ckpt=pred.model_ckpt,
-        image_dir=pred.image_dir,
-        output_csv=out_csv,
+        image_folder=pred.image_dir,
+        model_path=pred.model_ckpt,
+        label_map_path=label_map,
+        out_csv=out_csv,
         batch_size=pred.batch_size,
     )
-    return {"run_dir": str(run_dir), "output_csv": str(out_csv), **result}
+    return {"run_dir": str(run_dir), "output_csv": str(out_csv), "out_csv": result}
 
 
 # ======================================================

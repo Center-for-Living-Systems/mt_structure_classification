@@ -25,7 +25,6 @@ install-cpu:  ## pip install with torch CPU (no conda needed)
 	pip install -e ".[torch-cpu,dev]"
 
 
-
 # ── per group tests ─────────────────────────────────────────────────────────────────
 
 test-segmentation:  ## Run segmentation tests only (steps 1-4)
@@ -34,9 +33,6 @@ test-segmentation:  ## Run segmentation tests only (steps 1-4)
 test-training:  ## Run training/prediction tests only (steps 5-6)
 	$(RUN) pytest test/test_pipeline_steps5to6.py -v --device cpu
 
-
-test-training:  ## Run training/prediction tests only (steps 5-6)
-	$(RUN) pytest test/test_pipeline_steps5to6.py -v --device cuda
 
 
 # ── CPU tests ─────────────────────────────────────────────────────────────────
@@ -65,6 +61,10 @@ test-cuda-cellpose:  ## Run all tests on CUDA GPU including cellpose
 	$(RUN) pytest test/ -v \
 		-m cellpose \
 		--device cuda
+
+test-cuda-training:  ## Run training/prediction tests only (steps 5-6)
+	$(RUN) pytest test/test_pipeline_steps5to6.py -v --device cuda
+
 
 test-cuda-all:  ## Run all tests on CUDA GPU
 	$(RUN) pytest test/ -v --device cuda

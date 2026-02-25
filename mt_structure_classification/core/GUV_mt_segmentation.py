@@ -52,7 +52,7 @@ def get_cellpose_model(
     gpu: bool = False,
 ):
     from cellpose import models
-    return models.CellposeModel(gpu=gpu, model_type=model_type)  
+    return models.CellposeModel(gpu=gpu, model_type=model_type)
 
 
 def _upsample_labels(labels_small: np.ndarray, target_h: int, target_w: int) -> np.ndarray:
@@ -189,7 +189,7 @@ def segment_guv_cellpose(
     guv_mt_img[0] = guv_img_norm
     guv_mt_img[1] = mt_img_norm
 
-    
+
     model = get_cellpose_model(model_type=model_type, gpu=gpu)
     result = model.eval(
         guv_mt_img[:, ::2, ::2],
@@ -197,7 +197,7 @@ def segment_guv_cellpose(
         channels=channels,
         **kwargs,
     )
-    
+
     # Handle both old (4 values) and new (3 values) API
     if len(result) == 4:
         masks_small, _, _, _ = result  # v2.x
