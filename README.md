@@ -12,7 +12,16 @@ The pipeline takes paired fluorescence microscopy TIFFs (GUV channel + microtubu
 4. **Crops MT patches** — extracts 96x96 pixel patches from each detected GUV
 5. **Classifies** — fine-tuned EfficientNet-B0 (also supports ResNet18, ConvNeXt-Tiny) classifies patches into 5 MT structure classes using focal loss
 
-A **trained model** is provided in the `models/` folder. This is the checkpoint used for the results presented in the paper (trained on the paper’s data). Use it for inference with `run_prediction.py` by passing `--model-path models/best_model.pth` (and `--label-map models/label_map.json` if needed).
+A **trained model** is provided in the `models/` folder. This is the model used for the results presented in the paper (trained on the paper’s data). Use it for inference with `run_prediction.py` by passing `--model-path models/trained_model_20250618.pth` (and `--label-map models/label_map.json` if needed).
+
+Figure 1: Example GUV segmentation.
+
+<img src="https://github.com/user-attachments/assets/7ce6fcab-f337-4aa0-b69f-9f815f02f8f3" style="width:60%;"/>
+
+Figure 2: Classifier training.
+
+<img src="https://github.com/user-attachments/assets/0ba464ca-b8cd-4d16-a89e-af54d19984f7" style="width:60%;"/>
+
 
 #### Pipeline overview (paper results)
 
@@ -100,7 +109,7 @@ mt_structure_classification/
 │   ├── test_pipeline_steps1to4.py  # Preprocessing and segmentation tests
 │   └── test_pipeline_steps5to6.py  # Training and prediction tests
 ├── models/                           # Trained model (paper)
-│   ├── best_model.pth              # Checkpoint used for paper results
+│   ├── trained_model_20250618.pth    # Model weights trained and used for paper results
 │   └── label_map.json               # Class name → index
 ├── environment.yml                   # Conda environment (CPU/macOS)
 ├── environment-cuda.yml             # Conda environment (CUDA GPU)
@@ -113,7 +122,6 @@ mt_structure_classification/
 
 The workflow is implemented as a Python package. All steps have CLI scripts in `scripts/`; steps 1–4 can also be run via the package API (`pipeline.full_pipeline`, `core.GUV_mt_segmentation`, `dataset`, `utils`).
 
-<img src="https://github.com/user-attachments/assets/0ba464ca-b8cd-4d16-a89e-af54d19984f7" style="width:70%;"/>
 
 #### Installation
 
@@ -157,9 +165,6 @@ pip install -e ".[dev]"
 
 **Programmatic config:** `mt_structure_classification.pipeline.full_pipeline` exposes `PreprocessConfig`, `SegmentationConfig`, `TrainingConfig`, `PredictConfig` for running steps 1–6 from Python with custom parameters.
 
-#### Acknowledgments
-
-This pipeline was developed to support the classification of cytoskeletal structures in microscopy images from microtubule experiments involving GUVs. Inspired by efforts at the Center for Living Systems, University of Chicago.
 
 ## About
 This computational pipeline was developed by Liya Ding at the Center for Living Systems, University of Chicago, as a contribution to the quantitative image analysis for a collaborative study on tau-mediated cytoskeletal crosstalk in reconstituted systems.
