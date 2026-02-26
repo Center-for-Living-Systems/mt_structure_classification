@@ -6,11 +6,9 @@ This repository contains a complete workflow for performing image classification
 
 The pipeline takes paired fluorescence microscopy TIFFs (GUV channel + microtubule channel) and:
 
-1. **Indexes image pairs** — matches GUV and MT files by naming conventions
-2. **Preprocesses** — 2D max-projection, pad/crop to 512x512, background subtraction (median filter), percentile normalization
-3. **Segments GUVs** — detects individual vesicles using Cellpose (deep learning instance segmentation) and/or Hough circle detection, with filtering by eccentricity, area, and MT signal
-4. **Crops MT patches** — extracts 96x96 pixel patches from each detected GUV
-5. **Classifies** — fine-tuned EfficientNet-B0 (also supports ResNet18, ConvNeXt-Tiny) classifies patches into 5 MT structure classes using focal loss
+1. **Preprocesses** — matches GUV and MT files, background subtraction (median filter), percentile normalization
+2. **Segments GUVs and MT** — detects individual vesicles using Cellpose (deep learning instance segmentation) and/or Hough circle detection, with filtering by eccentricity, area, and MT signal. And crops MT patches — extracts 96x96 pixel patches from each detected GUV
+3. **Classifies** — fine-tuned EfficientNet-B0 (also supports ResNet18, ConvNeXt-Tiny) classifies patches into 5 MT structure classes using focal loss
 
 A **trained model** is provided in the `models/` folder. This is the model used for the results presented in the paper (trained on the paper’s data). Use it for inference with `run_prediction.py` by passing `--model-path models/trained_model_20250618.pth` (and `--label-map models/label_map.json` if needed).
 
