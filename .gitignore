@@ -20,6 +20,7 @@ pip-wheel-metadata/
 build/
 dist/
 pip-log.txt
+*.egg
 
 # If you use poetry/pdm/uv etc
 .poetry/

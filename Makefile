@@ -24,39 +24,62 @@ install-dev:  ## pip install with dev extras
 install-cpu:  ## pip install with torch CPU (no conda needed)
 	pip install -e ".[torch-cpu,dev]"
 
+
+# ── per group tests ─────────────────────────────────────────────────────────────────
+
+test-segmentation:  ## Run segmentation tests only (steps 1-4)
+	$(RUN) pytest test/test_pipeline_steps1to4.py -v --device cpu
+
+test-training:  ## Run training/prediction tests only (steps 5-6)
+	$(RUN) pytest test/test_pipeline_steps5to6.py -v --device cpu
+
+
+
 # ── CPU tests ─────────────────────────────────────────────────────────────────
 
 test:  ## Run fast tests on CPU (hough circles + classifier smoke test)
-	$(RUN) pytest test/test_pipeline_steps1to4.py test/test_pipeline_steps5to6.py -v \
-		-k "not cellpose" \
+	$(RUN) pytest test/ -v \
+		-m "not cellpose" \
 		--device cpu
 
 test-cellpose:  ## Run all CPU tests including cellpose (needs model download)
-	$(RUN) pytest test/test_pipeline_steps1to4.py test/test_pipeline_steps5to6.py -v \
-		--runcellpose \
+	$(RUN) pytest test/ -v \
+		-m cellpose \
 		--device cpu
+
+test-all:  ## Run all tests on CPU
+	$(RUN) pytest test/ -v --device cpu
 
 # ── CUDA tests ────────────────────────────────────────────────────────────────
 
 test-cuda:  ## Run fast tests on CUDA GPU
-	$(RUN) pytest test/test_pipeline_steps1to4.py test/test_pipeline_steps5to6.py -v \
-		-k "not cellpose" \
+	$(RUN) pytest test/ -v \
+		-m "not cellpose" \
 		--device cuda
 
 test-cuda-cellpose:  ## Run all tests on CUDA GPU including cellpose
-	$(RUN) pytest test/test_pipeline_steps1to4.py test/test_pipeline_steps5to6.py -v \
-		--runcellpose \
+	$(RUN) pytest test/ -v \
+		-m cellpose \
 		--device cuda
 
+test-cuda-training:  ## Run training/prediction tests only (steps 5-6)
+	$(RUN) pytest test/test_pipeline_steps5to6.py -v --device cuda
+
+
+test-cuda-all:  ## Run all tests on CUDA GPU
+	$(RUN) pytest test/ -v --device cuda
+
+# ── Code quality ──────────────────────────────────────────────────────────────
+
 lint:  ## Run ruff linter
-	$(RUN) ruff check src/ test/ scripts/
+	$(RUN) ruff check mt_structure_classification/ test/ scripts/
 
 format:  ## Auto-format with ruff + black
-	$(RUN) ruff check --fix src/ test/ scripts/
-	$(RUN) black src/ test/ scripts/
+	$(RUN) ruff check --fix mt_structure_classification/ test/ scripts/
+	$(RUN) black mt_structure_classification/ test/ scripts/
 
 clean:  ## Remove build artifacts and caches
-	rm -rf build/ dist/ *.egg-info src/*.egg-info
+	rm -rf build/ dist/ *.egg-info
 	find . -type d -name __pycache__ -exec rm -rf {} + 2>/dev/null || true
 	find . -type f -name '*.pyc' -delete 2>/dev/null || true
 
