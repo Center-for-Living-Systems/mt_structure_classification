@@ -243,8 +243,9 @@ class TestStep3HoughSegmentation:
 
 @pytest.mark.cellpose
 class TestStep3CellposeSegmentation:
-    def test_cellpose_runs(self, background_and_stats):
+    def test_cellpose_runs(self, background_and_stats, cellpose_gpu):
         from mt_structure_classification.core.GUV_mt_segmentation import (
+            DEFAULT_CELLPOSE_DIAMETER,
             segment_guv_cellpose,
         )
 
@@ -267,8 +268,8 @@ class TestStep3CellposeSegmentation:
         label_mask_filtered, _bad_flags = segment_guv_cellpose(
             guv_norm, mt_norm, mt_corr[0],
             model_type="cyto3",
-            gpu=False,  # CPU for CI
-            diameter=None,
+            gpu=cellpose_gpu,  # CPU by default; use pytest --device cuda for GPU
+            diameter=DEFAULT_CELLPOSE_DIAMETER,
             channels=[1, 2],
             mt_bg_int=stats["mt"]["bg_intensity"],
             mt_std_threshold=MT_STD_THRESHOLD,
@@ -333,12 +334,12 @@ class TestStep4Cropping:
         assert isinstance(obj_df, pd.DataFrame)
 
         if len(obj_df) > 0:
-            # check patches were saved
+            # patches were saved
             for fname in obj_df["filename"]:
                 patch_path = crops_dir / fname
                 assert patch_path.is_file(), f"Patch not saved: {patch_path}"
 
-            # check patch dimensions
+            # patch dimensions
             import tifffile
             sample = tifffile.imread(str(crops_dir / obj_df["filename"].iloc[0]))
             assert sample.shape == (PATCH_SIZE, PATCH_SIZE)
@@ -390,10 +391,9 @@ class TestStep4Cropping:
             )
             all_dfs.append(obj_df)
 
-        # should process all 5 images without error
         assert len(all_dfs) == 5
 
-        # concatenate and check metadata
+        # concatenate metadata
         combined = pd.concat([d for d in all_dfs if not d.empty], ignore_index=True)
         if len(combined) > 0:
             assert "filename" in combined.columns

@@ -20,7 +20,6 @@ class PairingRules:
 
 
 def iter_tiff_files(folder: Path, suffixes: tuple[str, ...] = (".tif", ".tiff")) -> Iterable[Path]:
-    # case-insensitive suffix check
     for p in folder.iterdir():
         if p.is_file() and p.suffix.lower() in suffixes:
             yield p

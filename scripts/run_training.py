@@ -6,10 +6,11 @@ Trains an EfficientNet (or other) classifier on labeled 96×96 MT patches.
 
 Input:
   - CSV with columns: filename, label (path relative to image-dir)
-  - Directory of crop images (e.g. output of run_segmentation_pipeline.py)
+  - Directory of crop images (e.g. crops/ from run_segmentation.py)
 
 Output:
   - best_model.pth, label_map.json, train_split.csv, val_split.csv in --output-dir
+  - loss_curves.png (train/val loss and accuracy), confusion_matrix.png (validation)
 
 Usage (from repo root, with package installed: pip install -e .):
   python scripts/run_training.py \\
@@ -18,6 +19,8 @@ Usage (from repo root, with package installed: pip install -e .):
       --output-dir results/train_run \\
       --epochs 200 \\
       --patience 30
+
+Device: --device auto (default) uses CUDA if available, else CPU. Use --device cuda or --device cpu to force.
 """
 
 from __future__ import annotations
@@ -54,9 +57,13 @@ def main():
                         help="Random seed (default: 42)")
     parser.add_argument("--num-workers", type=int, default=4,
                         help="DataLoader workers (default: 4)")
+    parser.add_argument("--device", choices=["auto", "cuda", "cpu"], default="auto",
+                        help="Device for training: auto (default), cuda, or cpu")
     args = parser.parse_args()
 
     args.output_dir.mkdir(parents=True, exist_ok=True)
+
+    device_prefer = None if args.device == "auto" else args.device
 
     train_cfg = TrainConfig(
         batch_size=args.batch_size,
@@ -72,6 +79,7 @@ def main():
         out_dir=args.output_dir,
         model_name=args.model,
         train_cfg=train_cfg,
+        device=device_prefer,
     )
     print(f"Best checkpoint: {ckpt}")
     print(f"Label map: {args.output_dir / 'label_map.json'}")

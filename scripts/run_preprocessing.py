@@ -5,6 +5,8 @@ run_preprocessing.py — Steps 1–2: Index pairs + background & channel statist
   1. Index GUV/MT image pairs
   2. Load stacks, compute background median and channel statistics
 
+With --save-plots, writes preprocessing diagnostic panels to debug/.
+
 Output is written to --output-dir for use by run_segmentation.py (steps 3–4).
 
 Usage (from repo root, with package installed: pip install -e .):
@@ -14,11 +16,12 @@ Usage (from repo root, with package installed: pip install -e .):
 
 Output:
     results/preprocessed/
-    └── metadata/
-        ├── pairs.csv      # indexed image pairs
-        ├── stats.json     # channel statistics (norm percentiles, bg intensity)
-        ├── guv_bg.npy     # GUV background image (512×512)
-        └── mt_bg.npy      # MT background image (512×512)
+    ├── metadata/
+    │   ├── pairs.csv      # indexed image pairs
+    │   ├── stats.json     # channel statistics (norm percentiles, bg intensity)
+    │   ├── guv_bg.npy     # GUV background image (512×512)
+    │   └── mt_bg.npy      # MT background image (512×512)
+    └── debug/             # optional, with --save-plots (preprocessing panels)
 """
 
 from __future__ import annotations
@@ -35,6 +38,7 @@ from mt_structure_classification.dataset.image_files_indexing import (
 from mt_structure_classification.utils.image_processing import (
     compute_background_median,
     compute_channel_statistics,
+    remove_background_and_pad,
     stack_pairs_to_arrays,
 )
 
@@ -45,6 +49,8 @@ def run_preprocessing(
     target_shape: tuple[int, int] = (512, 512),
     disk_radius: int = 5,
     max_images: int | None = None,
+    save_plots: bool = False,
+    max_plot_images: int | None = 10,
 ) -> Path:
     """
     Run steps 1–2: index pairs, load stacks, compute background and stats.
@@ -103,6 +109,42 @@ def run_preprocessing(
     np.save(metadata_dir / "mt_bg.npy", mt_bg)
     print(f"  Saved guv_bg.npy, mt_bg.npy")
 
+    if save_plots:
+        print("  Saving preprocessing panels to debug/...")
+        debug_dir = output_dir / "debug"
+        debug_dir.mkdir(exist_ok=True)
+        guv_corr, mt_corr = remove_background_and_pad(
+            guv_stack, mt_stack,
+            guv_bg=guv_bg, mt_bg=mt_bg,
+            guv_bg_intensity=stats["guv"]["bg_intensity"],
+            mt_bg_intensity=stats["mt"]["bg_intensity"],
+        )
+        guv_1p = stats["guv"]["norm_low"]
+        guv_99p = stats["guv"]["norm_high"]
+        mt_1p = stats["mt"]["norm_low"]
+        mt_99p = stats["mt"]["norm_high"]
+        n_plot = len(df) if max_plot_images is None else min(len(df), max_plot_images)
+        from mt_structure_classification.utils.plotting_functions import plot_preprocessing_panel
+        for i in range(n_plot):
+            guv_norm = np.clip(
+                (guv_corr[i] - guv_1p) / max(guv_99p - guv_1p, 1e-6), 0, 1
+            ).astype(np.float32)
+            mt_norm = np.clip(
+                (mt_corr[i] - mt_1p) / max(mt_99p - mt_1p, 1e-6), 0, 1
+            ).astype(np.float32)
+            title = f"Image {i}"
+            plot_preprocessing_panel(
+                np.nan_to_num(guv_stack[i], nan=0.0),
+                np.nan_to_num(mt_stack[i], nan=0.0),
+                guv_bg, mt_bg,
+                guv_corr[i], mt_corr[i],
+                guv_norm, mt_norm,
+                image_index=i,
+                title=title,
+                out_path=debug_dir / f"img{i:05d}_0_preprocessing.png",
+            )
+        print(f"  Saved {n_plot} preprocessing panels to {debug_dir}")
+
     print("\n" + "=" * 70)
     print("PREPROCESSING COMPLETE. Run run_segmentation.py with --preprocessed-dir")
     print("=" * 70 + "\n")
@@ -139,6 +181,18 @@ def main():
         default=5,
         help="Disk radius for background median filter (default: 5)",
     )
+    parser.add_argument(
+        "--save-plots",
+        action="store_true",
+        help="Save preprocessing diagnostic panels to output debug/",
+    )
+    parser.add_argument(
+        "--max-plot-images",
+        type=int,
+        default=10,
+        metavar="N",
+        help="Max number of preprocessing panels to save when --save-plots (default: 10)",
+    )
     args = parser.parse_args()
 
     run_preprocessing(
@@ -146,6 +200,8 @@ def main():
         output_dir=args.output_dir,
         disk_radius=args.disk_radius,
         max_images=args.max_images,
+        save_plots=args.save_plots,
+        max_plot_images=args.max_plot_images,
     )
 
 

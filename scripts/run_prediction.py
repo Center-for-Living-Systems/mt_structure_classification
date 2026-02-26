@@ -6,7 +6,7 @@ Runs a trained classifier on a folder of 96×96 MT patches and writes
 predictions to a CSV.
 
 Input:
-  - Folder of crop images (e.g. from run_segmentation_pipeline.py)
+  - Folder of crop images (e.g. crops/ from run_segmentation.py)
   - Trained checkpoint (best_model.pth) and label_map.json (from run_training.py)
 
 Output:

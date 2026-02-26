@@ -465,7 +465,8 @@ def plot_per_object_panel(
     axes[1, 1].set_title(f"In this image: Cell {cell_id:02d}")
 
     # [1,2] cropped patch
-    axes[1, 2].imshow(_norm(patch), clim=(0, 1), cmap="gray")
+    # axes[1, 2].imshow(_norm(patch), clim=(0, 1), cmap="gray")
+    axes[1, 2].imshow((patch), clim=(0, 1), cmap="gray")
     axes[1, 2].set_title("Cropped object")
 
     for ax in axes.flat:

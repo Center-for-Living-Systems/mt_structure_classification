@@ -1,6 +1,6 @@
 # Full pipeline orchestration (steps 1-6) with config dataclasses.
 # For CLI entry points that reproduce paper results, use scripts in the repo:
-#   scripts/run_segmentation_pipeline.py (steps 1-4)
+#   scripts/run_preprocessing.py (steps 1-2), scripts/run_segmentation.py (steps 3-4)
 #   scripts/run_training.py (step 5)
 #   scripts/run_prediction.py (step 6)
 from __future__ import annotations
@@ -20,6 +20,7 @@ from mt_structure_classification.core.GUV_mt_segmentation import (
     DEFAULT_HOUGH_SCALES,
     combine_segmentations,
     crop_objects_from_masks_or_circles,
+    get_cellpose_model,
     segment_guv_cellpose,
     segment_guv_hough_circles,
 )
@@ -180,7 +181,7 @@ def run_segmentation_pipeline(
 ) -> dict[str, object]:
     """
     Steps 3-4: Segment GUVs (Hough and/or Cellpose) and crop 96x96 MT patches.
-    Uses same APIs as scripts/run_segmentation_pipeline.py and tests.
+    Uses same APIs as scripts/run_preprocessing.py, scripts/run_segmentation.py and tests.
     """
     if seg is None:
         seg = _DEFAULT_SEGMENTATION
@@ -220,6 +221,12 @@ def run_segmentation_pipeline(
     mt_1p = stats["mt"]["norm_low"]
     mt_99p = stats["mt"]["norm_high"]
 
+    cellpose_model_instance = None
+    if seg.method in ("cellpose", "combined"):
+        cellpose_model_instance = get_cellpose_model(
+            model_type=seg.cellpose_model, gpu=False
+        )
+
     for i in range(len(df)):
         row = df.iloc[i]
         guv = guv_pad[i]
@@ -249,6 +256,7 @@ def run_segmentation_pipeline(
                 max_eccentricity=seg.max_eccentricity,
                 min_area=seg.min_area,
                 max_area=seg.max_area,
+                model=cellpose_model_instance,
             )
 
         if seg.method in ("circle", "combined"):

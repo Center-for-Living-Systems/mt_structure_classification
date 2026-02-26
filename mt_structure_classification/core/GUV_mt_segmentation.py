@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import contextlib
+import time
 from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
@@ -46,12 +47,29 @@ DEFAULT_HOUGH_SCALES: tuple[HoughCircleConfig, ...] = (
 # ============================================================
 #                         CELLPOSE
 # ============================================================
+# Input to model.eval() is downsampled (::2) so 512x512 -> 256x256.
+# Hough radii 10–90 px (full res) -> ~10–90 px diameter in 256 space.
+# Passing diameter=None triggers slow per-image diameter estimation in Cellpose;
+# use a fixed diameter (e.g. 40) for much faster inference (~seconds instead of ~100s per image).
+DEFAULT_CELLPOSE_DIAMETER = 40.0
+
 
 def get_cellpose_model(
     model_type: str = "cyto3",
     gpu: bool = False,
 ):
+    import torch
     from cellpose import models
+    if gpu and not torch.cuda.is_available():
+        import warnings
+        warnings.warn(
+            "Cellpose GPU requested but PyTorch has no CUDA (CPU-only build). Using CPU.",
+            UserWarning,
+            stacklevel=2,
+        )
+        gpu = False
+    device = "CUDA" if gpu else "CPU"
+    print(f"Cellpose device: {device}")
     return models.CellposeModel(gpu=gpu, model_type=model_type)
 
 
@@ -146,6 +164,8 @@ def segment_guv_cellpose(
     max_eccentricity: float = 0.5,
     min_area: int = 1000,
     max_area: int = 40000,
+    model: Any = None,
+    timing_out: dict[str, float] | None = None,
     **kwargs: Any,
 ) -> tuple[np.ndarray, np.ndarray]:
     """
@@ -170,6 +190,11 @@ def segment_guv_cellpose(
     mt_std_threshold : float
     max_eccentricity : float
     min_area, max_area : int
+    model : CellposeModel or None
+        If provided, this model is used (avoids loading the model on every image).
+        If None, a model is loaded via get_cellpose_model(model_type=..., gpu=...).
+    timing_out : dict or None
+        If provided, filled with keys 'eval', 'upsample', 'filter' (seconds) for profiling.
 
     Returns
     -------
@@ -189,14 +214,19 @@ def segment_guv_cellpose(
     guv_mt_img[0] = guv_img_norm
     guv_mt_img[1] = mt_img_norm
 
+    if model is None:
+        model = get_cellpose_model(model_type=model_type, gpu=gpu)
+    # Use fixed diameter to avoid slow per-image diameter estimation (~100s/img when None)
+    eval_diameter = diameter if diameter is not None else DEFAULT_CELLPOSE_DIAMETER
 
-    model = get_cellpose_model(model_type=model_type, gpu=gpu)
+    t0 = time.perf_counter()
     result = model.eval(
         guv_mt_img[:, ::2, ::2],
-        diameter=diameter,
+        diameter=eval_diameter,
         channels=channels,
         **kwargs,
     )
+    t_eval = time.perf_counter() - t0
 
     # Handle both old (4 values) and new (3 values) API
     if len(result) == 4:
@@ -204,21 +234,27 @@ def segment_guv_cellpose(
     else:
         masks_small, _, _ = result      # v4.x
 
-
-
-    # upsample back to full resolution
-    label_mask = _upsample_labels(masks_small, h, w)
-
-    # filter using raw MT image — thresholds are in raw intensity units
-    label_mask_filtered, bad_flags = filter_cellpose_masks(
-        label_mask,
-        mt_img=mt_img_raw,
+    t0 = time.perf_counter()
+    # Filter at 256x256 (same resolution as masks_small) to avoid slow median_rank/regionprops on 512x512
+    mt_small = mt_img_raw[::2, ::2]
+    area_scale = 4  # 512->256: area in small space is 1/4
+    label_mask_filtered_small, bad_flags = filter_cellpose_masks(
+        masks_small.astype(np.int32),
+        mt_img=mt_small,
         mt_bg_int=mt_bg_int,
         mt_std_threshold=mt_std_threshold,
         max_eccentricity=max_eccentricity,
-        min_area=min_area,
-        max_area=max_area,
+        min_area=max(1, min_area // area_scale),
+        max_area=max_area // area_scale,
     )
+    # Upsample filtered mask to full resolution (fast: numpy slice copy)
+    label_mask_filtered = _upsample_labels(label_mask_filtered_small, h, w)
+    t_filter_upsample = time.perf_counter() - t0
+
+    if timing_out is not None:
+        timing_out["eval"] = t_eval
+        timing_out["upsample"] = 0.0  # now folded into filter step
+        timing_out["filter"] = t_filter_upsample
 
     return label_mask_filtered, bad_flags
 
