@@ -1,6 +1,10 @@
 CONDA_ENV = mt_structure_classification
 RUN = conda run -n $(CONDA_ENV)
 
+# Optional CUDA conda env (override for CUDA targets)
+CONDA_ENV_CUDA = mt_structure_classification_cuda
+RUN_CUDA = conda run -n $(CONDA_ENV_CUDA)
+
 .PHONY: env env-cuda install install-dev test test-cellpose test-cuda test-cuda-cellpose lint format clean help
 
 help:  ## Show this help
@@ -24,50 +28,58 @@ install-dev:  ## pip install with dev extras
 install-cpu:  ## pip install with torch CPU (no conda needed)
 	pip install -e ".[torch-cpu,dev]"
 
+# Ensure editable install exists inside the target conda envs
+.PHONY: ensure-installed ensure-installed-cuda
+ensure-installed:
+	$(RUN) pip install -e .
+
+ensure-installed-cuda:
+	$(RUN_CUDA) pip install -e .
+
 
 # ── per group tests ─────────────────────────────────────────────────────────────────
 
-test-segmentation:  ## Run segmentation tests only (steps 1-4)
+test-segmentation: ensure-installed  ## Run segmentation tests only (steps 1-4)
 	$(RUN) pytest test/test_pipeline_steps1to4.py -v --device cpu
 
-test-training:  ## Run training/prediction tests only (steps 5-6)
+test-training: ensure-installed  ## Run training/prediction tests only (steps 5-6)
 	$(RUN) pytest test/test_pipeline_steps5to6.py -v --device cpu
 
 
 
 # ── CPU tests ─────────────────────────────────────────────────────────────────
 
-test:  ## Run fast tests on CPU (hough circles + classifier smoke test)
+test: ensure-installed  ## Run fast tests on CPU (hough circles + classifier smoke test)
 	$(RUN) pytest test/ -v \
 		-m "not cellpose" \
 		--device cpu
 
-test-cellpose:  ## Run all CPU tests including cellpose (needs model download)
+test-cellpose: ensure-installed  ## Run all CPU tests including cellpose (needs model download)
 	$(RUN) pytest test/ -v \
 		-m cellpose \
 		--device cpu
 
-test-all:  ## Run all tests on CPU
+test-all: ensure-installed  ## Run all tests on CPU
 	$(RUN) pytest test/ -v --device cpu
 
 # ── CUDA tests ────────────────────────────────────────────────────────────────
 
-test-cuda:  ## Run fast tests on CUDA GPU
-	$(RUN) pytest test/ -v \
+test-cuda: ensure-installed-cuda  ## Run fast tests on CUDA GPU
+	$(RUN_CUDA) pytest test/ -v \
 		-m "not cellpose" \
 		--device cuda
 
-test-cuda-cellpose:  ## Run all tests on CUDA GPU including cellpose
-	$(RUN) pytest test/ -v \
+test-cuda-cellpose: ensure-installed-cuda  ## Run all tests on CUDA GPU including cellpose
+	$(RUN_CUDA) pytest test/ -v \
 		-m cellpose \
 		--device cuda
 
-test-cuda-training:  ## Run training/prediction tests only (steps 5-6)
-	$(RUN) pytest test/test_pipeline_steps5to6.py -v --device cuda
+test-cuda-training: ensure-installed-cuda  ## Run training/prediction tests only (steps 5-6)
+	$(RUN_CUDA) pytest test/test_pipeline_steps5to6.py -v --device cuda
 
 
-test-cuda-all:  ## Run all tests on CUDA GPU
-	$(RUN) pytest test/ -v --device cuda
+test-cuda-all: ensure-installed-cuda  ## Run all tests on CUDA GPU
+	$(RUN_CUDA) pytest test/ -v --device cuda
 
 # ── Code quality ──────────────────────────────────────────────────────────────
 
